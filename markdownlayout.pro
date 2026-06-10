@@ -10,11 +10,13 @@ CONFIG -= app_bundle
 SOURCES += \
         main.cpp \
         mainwindow.cpp \
+        markdownlayout.cpp \
         qtextdocumentlayout/qcssutil.cpp \
         qtextdocumentlayout/qtextdocumentlayout.cpp
 
 HEADERS += \
         mainwindow.h \
+        markdownlayout.h \
         qtextdocumentlayout/qcssparser_p.h \
         qtextdocumentlayout/qcssutil_p.h \
         qtextdocumentlayout/qfixed_p.h \

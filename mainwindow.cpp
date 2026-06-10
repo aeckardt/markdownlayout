@@ -5,6 +5,7 @@
 #include <QTextDocument>
 
 #include "qtextdocumentlayout/qtextdocumentlayout.h"
+#include "markdownlayout.h"
 
 //#define DEFAULT_TEXTDOCUMENTLAYOUT
 
@@ -65,7 +66,7 @@ MainWindow::MainWindow(QWidget *parent, Qt::WindowFlags flags)
 
     QTextDocument *document = textEdit->document();
 #ifndef DEFAULT_TEXTDOCUMENTLAYOUT
-    QTextDocumentLayout *customLayout = new QTextDocumentLayout(document);
+    QAbstractTextDocumentLayout *customLayout = new MarkdownLayout(document);
     document->setDocumentLayout(customLayout);
 #endif
     document->setHtml(htmlInput1);
