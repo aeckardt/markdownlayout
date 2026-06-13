@@ -3,11 +3,6 @@
 #include <QPainter>
 #include <QTextBlock>
 
-const int BLOCK_TYPE_PROPERTY = QTextFormat::Property::UserProperty + 1;
-const int BLOCK_TYPE_NORMAL = 0;
-const int BLOCK_TYPE_QUOTE  = 1;
-const int BLOCK_TYPE_CODE   = 2;
-
 MarkdownLayout::MarkdownLayout(QTextDocument *doc)
     : QAbstractTextDocumentLayout(doc),
       m_documentSize(m_metrics.fallbackWidth, 0.0)
@@ -92,10 +87,17 @@ QSizeF MarkdownLayout::documentSize() const
 QRectF MarkdownLayout::blockBoundingRect(const QTextBlock &block) const
 {
     const_cast<MarkdownLayout *>(this)->ensureLayout();
-    if (!m_blockRects.contains(block.position())) {
+
+    if (!block.isValid())
         return QRectF();
-    }
-    return m_blockRects[block.position()];
+
+    const QTextLayout *layout = block.layout();
+    if (!layout)
+        return QRectF();
+
+    QRectF rect = layout->boundingRect();
+    rect.moveTopLeft(layout->position());
+    return rect;
 }
 
 QRectF MarkdownLayout::frameBoundingRect(QTextFrame *frame) const
@@ -185,7 +187,7 @@ void MarkdownLayout::ensureLayout()
     m_documentSize = QSizeF(docWidth, totalHeight);
 }
 
-float MarkdownLayout::layoutBlockText(QTextLayout *layout, float lineWidth) const
+qreal MarkdownLayout::layoutBlockText(QTextLayout *layout, qreal lineWidth) const
 {
     layout->beginLayout();
     float y = 0.0;
@@ -202,25 +204,18 @@ float MarkdownLayout::layoutBlockText(QTextLayout *layout, float lineWidth) cons
     return y;
 }
 
-float MarkdownLayout::documentWidth() const
+qreal MarkdownLayout::documentWidth() const
 {
     const QTextDocument *doc = document();
-
-    // QTextEdit normally keeps QTextDocument::textWidth() in sync with the
-    // viewport width. In a stand-alone widget you can call setTextWidth().
-    if (doc->textWidth() > 0.0) {
-        return std::max(240.0, doc->textWidth());
-    }
-
-    QSizeF pageSize = doc->pageSize();
-    if (pageSize.isValid() && pageSize.width() > 0.0) {
-        return std::max(240.0, pageSize.width());
+    const qreal width = doc->pageSize().width(); // == doc->textWidth()
+    if (width > 0.0) {
+        return std::max<qreal>(80.0, width);
     }
 
     return m_metrics.fallbackWidth;
 }
 
-float MarkdownLayout::topPaddingForBlock(QTextBlock block) const
+qreal MarkdownLayout::topPaddingForBlock(QTextBlock block) const
 {
     int type = blockType(block);
     if (type == BLOCK_TYPE_QUOTE || type == BLOCK_TYPE_CODE) {
@@ -229,7 +224,7 @@ float MarkdownLayout::topPaddingForBlock(QTextBlock block) const
     return 0.0;
 }
 
-float MarkdownLayout::bottomPaddingForBlock(QTextBlock block) const
+qreal MarkdownLayout::bottomPaddingForBlock(QTextBlock block) const
 {
     int type = blockType(block);
     if (type == BLOCK_TYPE_QUOTE || type == BLOCK_TYPE_CODE) {
@@ -284,7 +279,7 @@ void MarkdownLayout::drawMarkdownListMarker(QPainter *painter, QTextBlock block)
 
     QTextLine firstLine = layout->lineAt(0);
     qreal baselineY = layout->position().y() + firstLine.y() + firstLine.ascent();
-    qreal markerX = layout->position().x() + m_metrics.listMarkerWidth + 6.0;
+    qreal markerX = layout->position().x() - m_metrics.listMarkerWidth + 6.0;
 
     painter->save();
     painter->setPen(QPen(QColor("#57606a")));

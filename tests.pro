@@ -3,38 +3,28 @@ QT += core gui widgets
 CONFIG += c++17 console
 CONFIG -= app_bundle
 
+QMAKE_CXXFLAGS += -fmessage-length=0
+
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
-    src/main.cpp \
-    src/mainwindow.cpp \
-    src/markdownlayout/markdownlayout.cpp \
-    src/qtextdocumentlayout/qcssutil.cpp \
-    src/qtextdocumentlayout/qtextdocumentlayout.cpp \
+    src/texteditor/inlineformatresolver.cpp \
     src/texteditor/htmlexporter.cpp \
     src/texteditor/htmlimporter.cpp \
     src/texteditor/htmlstyle.cpp \
-    src/texteditor/inlineformatresolver.cpp \
     src/texteditor/markdownexporter.cpp \
     src/texteditor/markdownimporter.cpp \
     src/texteditor/markdowninlineparser.cpp \
-    src/texteditor/texteditorstyle.cpp
+    src/texteditor/texteditorstyle.cpp \
+    src/tests.cpp
 
 HEADERS += \
-    src/mainwindow.h \
-    src/markdownlayout/markdownlayout.h \
-    src/qtextdocumentlayout/qcssparser_p.h \
-    src/qtextdocumentlayout/qcssutil_p.h \
-    src/qtextdocumentlayout/qfixed_p.h \
-    src/qtextdocumentlayout/qfont_p.h \
-    src/qtextdocumentlayout/qtextdocumentlayout.h \
-    src/qtextdocumentlayout/qtextimagehandler_p.h \
+    src/texteditor/inlineformatresolver.h \
     src/texteditor/htmlexporter.h \
     src/texteditor/htmlimporter.h \
     src/texteditor/htmlstyle.h \
-    src/texteditor/inlineformatresolver.h \
     src/texteditor/markdownexporter.h \
     src/texteditor/markdownimporter.h \
     src/texteditor/markdowninlineparser.h \

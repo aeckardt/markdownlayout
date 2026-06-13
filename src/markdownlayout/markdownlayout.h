@@ -19,6 +19,11 @@ public:
     float quoteBarWidth = 4.0;
 };
 
+const int BLOCK_TYPE_PROPERTY = QTextFormat::Property::UserProperty + 1;
+const int BLOCK_TYPE_NORMAL = 0;
+const int BLOCK_TYPE_QUOTE  = 1;
+const int BLOCK_TYPE_CODE   = 2;
+
 class MarkdownLayout : public QAbstractTextDocumentLayout
 {
     Q_OBJECT
@@ -43,10 +48,10 @@ private:
     QMap<int, QRectF> m_blockRects;
 
     void ensureLayout();
-    float layoutBlockText(QTextLayout *layout, float lineWidth) const;
-    float documentWidth() const;
-    float topPaddingForBlock(QTextBlock block) const;
-    float bottomPaddingForBlock(QTextBlock block) const;
+    qreal layoutBlockText(QTextLayout *layout, qreal lineWidth) const;
+    qreal documentWidth() const;
+    qreal topPaddingForBlock(QTextBlock block) const;
+    qreal bottomPaddingForBlock(QTextBlock block) const;
 
     void drawBlockDecoration(QPainter *painter, QTextBlock block, QRectF rect);
     void drawMarkdownListMarker(QPainter *painter, QTextBlock block);
