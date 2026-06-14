@@ -21,10 +21,10 @@ struct InlineNode {
         Text
     };
 
-    inline InlineNode() : type(Type::Invalid) {}
-    inline InlineNode(Type type, const QVector<InlineNodePtr> &children = {})
+    InlineNode() : type(Type::Invalid) {}
+    InlineNode(Type type, const QVector<InlineNodePtr> &children = {})
         : type(type), children(children) {}
-    inline InlineNode(Type type, const QString &content, const QMap<QString, QVariant> &attrs = {})
+    InlineNode(Type type, const QString &content, const QMap<QString, QVariant> &attrs = {})
         : type(type), content(content), attrs(attrs) {}
     InlineNode(const InlineNode &) = delete;
 
@@ -60,6 +60,9 @@ struct InlineHtmlTag {
         : content(content), tag(tag), attrs(attrs) {}
 };
 
+class ScopeMarker;
+typedef std::shared_ptr<ScopeMarker> ScopeMarkerPtr;
+
 /*
  * Every open instance of ScopeMarker contains structure in form of a
  * floating node. This is wrapped by a closing ScopeMarker and then integrated
@@ -68,7 +71,6 @@ struct InlineHtmlTag {
 class ScopeMarker {
 public:
     enum class Type : int {
-        Invalid  = -1,
         // The integer values are also their priority
         // Lower integer = higher binding priority when resolving the stack
         HtmlTag  = 0, // "<ins>", "<span>", ...
@@ -76,14 +78,18 @@ public:
         Asterisk = 2  // "*", "**", "***", ...
     };
 
-    inline ScopeMarker() : m_type(Type::Invalid), m_data(nullptr), m_node(nullptr) {}
-    ScopeMarker(Type type, const DelimiterRun &dr, bool canOpen, bool canClose);
-    ScopeMarker(Type type, const InlineHtmlTag &iht, bool canOpen, bool canClose);
-    ScopeMarker(const ScopeMarker &) = delete;
-    ~ScopeMarker();
+    static ScopeMarkerPtr makeAsterisk(const DelimiterRun &dr, bool canOpen, bool canClose)
+    { return ScopeMarkerPtr(new ScopeMarker(Type::Asterisk, dr, canOpen, canClose)); }
 
-    inline bool isValid() const { return m_type != Type::Invalid; }
-    inline operator bool() const { return m_type != Type::Invalid; }
+    static ScopeMarkerPtr makeBracket(const DelimiterRun &dr, bool canOpen, bool canClose)
+    { return ScopeMarkerPtr(new ScopeMarker(Type::Bracket, dr, canOpen, canClose)); }
+
+    static ScopeMarkerPtr makeHtmlTag(const InlineHtmlTag &tag, bool canOpen, bool canClose)
+    { return ScopeMarkerPtr(new ScopeMarker(tag, canOpen, canClose)); }
+
+    ScopeMarker(const ScopeMarker &) = delete;
+    ScopeMarker &operator=(const ScopeMarker &) = delete;
+    ~ScopeMarker();
 
     inline Type type() const { return m_type; }
 
@@ -102,14 +108,19 @@ public:
     void clearNode();
 
 private:
+    ScopeMarker(Type type, const DelimiterRun &dr, bool canOpen, bool canClose);
+    ScopeMarker(const InlineHtmlTag &iht, bool canOpen, bool canClose);
+
     Type m_type;
+
+    // Invariant:
+    // - HtmlTag          -> m_data points to InlineHtmlTag
+    // - Bracket/Asterisk -> m_data points to DelimiterRun
     void *m_data;
     bool m_canOpen;
     bool m_canClose;
     InlineNodePtr m_node;
 };
-
-typedef std::shared_ptr<ScopeMarker> ScopeMarkerPtr;
 
 class MarkdownInlineParser {
 public:

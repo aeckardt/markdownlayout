@@ -40,10 +40,11 @@ ScopeMarker::ScopeMarker(Type type, const DelimiterRun &dr, bool canOpen, bool c
       m_canClose(canClose),
       m_node(nullptr)
 {
+    Q_ASSERT(type == Type::Bracket || type == Type::Asterisk);
 }
 
-ScopeMarker::ScopeMarker(Type type, const InlineHtmlTag &iht, bool canOpen, bool canClose)
-    : m_type(type),
+ScopeMarker::ScopeMarker(const InlineHtmlTag &iht, bool canOpen, bool canClose)
+    : m_type(Type::HtmlTag),
       m_data(new InlineHtmlTag(iht)),
       m_canOpen(canOpen),
       m_canClose(canClose),
@@ -134,6 +135,7 @@ void MarkdownInlineParser::parse()
 {
     // Initialize data
     m_astRoot->clear();
+    m_astRoot->type = NodeType::Container;
 
     m_currentParent = m_astRoot;
     m_openScopeStack.clear();
@@ -181,11 +183,9 @@ void MarkdownInlineParser::parse()
             //  2) (prev_char is not punctuation OR next_char is whitespace or punctuation)
             const bool rightFlanking = !prevIsWs && (!prevIsP || nextIsWs || nextIsP || nextIsTo);
 
-            ScopeMarkerPtr marker = std::make_shared<ScopeMarker>(
-                        MarkerType::Asterisk,
-                        DelimiterRun{QString(count, QLatin1Char('*'))},
-                        leftFlanking,
-                        rightFlanking);
+            ScopeMarkerPtr marker = ScopeMarker::makeAsterisk(
+                        {QString(count, QLatin1Char('*'))},
+                        leftFlanking, rightFlanking);
 
             if (rightFlanking) {
                 // Get matching marker node from stack
@@ -212,10 +212,7 @@ void MarkdownInlineParser::parse()
             if (m_pos + 1 < m_length && m_input.at(m_pos + 1) == QLatin1Char('[')) {
                 // '![' found at pos => push ScopeMarker to stack
                 flushText();
-                ScopeMarkerPtr marker = std::make_shared<ScopeMarker>(
-                            MarkerType::Bracket,
-                            DelimiterRun{QStringLiteral("![")},
-                            true, false);
+                ScopeMarkerPtr marker = ScopeMarker::makeBracket({QStringLiteral("![")}, true, false);
                 pushScopeMarker(marker);
                 m_pos += 2;
             } else {
@@ -227,20 +224,14 @@ void MarkdownInlineParser::parse()
         }
         case u'[': {
             flushText();
-            ScopeMarkerPtr marker = std::make_shared<ScopeMarker>(
-                        MarkerType::Bracket,
-                        DelimiterRun{QStringLiteral("[")},
-                        true, false);
+            ScopeMarkerPtr marker = ScopeMarker::makeBracket({QStringLiteral("[")}, true, false);
             pushScopeMarker(marker);
             ++m_pos;
             break;
         }
         case u']': {
             flushText();
-            ScopeMarkerPtr marker = std::make_shared<ScopeMarker>(
-                        MarkerType::Bracket,
-                        DelimiterRun{QStringLiteral("]")},
-                        false, true);
+            ScopeMarkerPtr marker = ScopeMarker::makeBracket({QStringLiteral("]")}, false, true);
             ++m_pos;
 
             // Get matching marker node from stack
@@ -470,9 +461,8 @@ ScopeMarkerPtr MarkdownInlineParser::tryParseHtmlTag()
         if (m_input.at(fwdPos) == QLatin1Char('>')) {
             // Valid closing tag found!
             // Advance position for parser
-            ScopeMarkerPtr marker = std::make_shared<ScopeMarker>(
-                        MarkerType::HtmlTag,
-                        InlineHtmlTag{m_input.mid(m_pos, fwdPos - m_pos + 1), tagName},
+            ScopeMarkerPtr marker = ScopeMarker::makeHtmlTag(
+                        {m_input.mid(m_pos, fwdPos - m_pos + 1), tagName},
                         false, true);
             m_pos = fwdPos + 1;
             return marker;
@@ -536,9 +526,8 @@ ScopeMarkerPtr MarkdownInlineParser::tryParseHtmlTag()
             // Self closing tag
             if (fwdPos + 1 < m_length && m_input.at(fwdPos + 1) == QLatin1Char('>')) {
                 // Valid self closing tag found!
-                ScopeMarkerPtr marker = std::make_shared<ScopeMarker>(
-                            MarkerType::HtmlTag,
-                            InlineHtmlTag{m_input.mid(m_pos, fwdPos - m_pos + 2), tagName, attrs},
+                ScopeMarkerPtr marker = ScopeMarker::makeHtmlTag(
+                            {m_input.mid(m_pos, fwdPos - m_pos + 2), tagName, attrs},
                             false, false);
                 m_pos = fwdPos + 2;
                 return marker;
@@ -546,9 +535,8 @@ ScopeMarkerPtr MarkdownInlineParser::tryParseHtmlTag()
             return {};
         } else if (ch == QLatin1Char('>')) {
             // Closing tag found
-            ScopeMarkerPtr marker = std::make_shared<ScopeMarker>(
-                        MarkerType::HtmlTag,
-                        InlineHtmlTag{m_input.mid(m_pos, fwdPos - m_pos + 1), tagName, attrs},
+            ScopeMarkerPtr marker = ScopeMarker::makeHtmlTag(
+                        {m_input.mid(m_pos, fwdPos - m_pos + 1), tagName, attrs},
                         true, false);
             m_pos = fwdPos + 1;
             return marker;
