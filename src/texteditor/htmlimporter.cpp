@@ -3,6 +3,7 @@
 #include "texteditorstyle.h"
 
 #include <QRegularExpression>
+#include <QScopeGuard>
 #include <QStringView>
 #include <QTextCursor>
 #include <QTextDocumentFragment>
@@ -99,7 +100,175 @@ static QString htmlUnescape(const QString &text)
     return out;
 }
 
-CssProperties HtmlRenderContext::getStyleFor(HtmlNodePtr node) const
+QVector<HtmlNodePtr> HtmlParser::parse(const QString &html)
+{
+    HtmlParser parser(html);
+
+    // Parse input into tokens
+    QVector<HtmlToken> tokens = parser.tokenize();
+
+    // initialize current token position
+    int pos = 0;
+
+    // Build and return syntax tree
+    // It might not be a tree in a strict sense
+    // but rather an array of roots
+    return parser.parseChildNodes(tokens, pos);
+}
+
+QVector<HtmlToken> HtmlParser::tokenize() const
+{
+    static const QRegularExpression tagPattern(R"((?<tag><[^>]+>)|(?<text>[^<]+))");
+    static const QRegularExpression attrPattern(
+        R"regex((?<name>[a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?<quote>["'])(?<value>.*?)\k<quote>)regex"
+    );
+    static const QSet<QString> selfClosingTags = {"br", "img", "hr", "meta"};
+
+    QVector<HtmlToken> tokens;
+
+    auto it = tagPattern.globalMatch(m_input);
+    while (it.hasNext()) {
+        QRegularExpressionMatch match = it.next();
+
+        const QString tag = match.captured("tag");
+        const QString text = match.captured("text");
+
+        if (!text.isEmpty()) {
+            if (QString(text).remove('\n').trimmed().isEmpty())
+                continue;
+
+            HtmlToken token;
+            token.type = TokenType::Text;
+            token.content = htmlUnescape(text);
+
+            tokens.append(token);
+        }
+        else if (!tag.isEmpty()) {
+            if (tag.startsWith("</")) {
+                // End tag
+                const QString tagName = tag.mid(2, tag.length() - 3)
+                                           .trimmed()
+                                           .toLower();
+
+                HtmlToken token;
+                token.type = TokenType::EndTag;
+                token.name = tagName;
+
+                tokens.append(token);
+            }
+            else {
+                const bool isSelfClosing = tag.endsWith("/>");
+
+                QString tagContent;
+                if (isSelfClosing)
+                    tagContent = tag.mid(1, tag.length() - 3).trimmed();
+                else
+                    tagContent = tag.mid(1, tag.length() - 2).trimmed();
+
+                QString tagName;
+                QString attrString;
+
+                static const QRegularExpression whitespacePattern(R"(\s)");
+                const int firstSpace = tagContent.indexOf(whitespacePattern);
+
+                if (firstSpace < 0)
+                    tagName = tagContent.toLower();
+                else {
+                    tagName = tagContent.left(firstSpace).toLower();
+                    attrString = tagContent.mid(firstSpace + 1).trimmed();
+                }
+
+                CssProperties attrs;
+
+                auto attrIt = attrPattern.globalMatch(attrString);
+                while (attrIt.hasNext()) {
+                    QRegularExpressionMatch attrMatch = attrIt.next();
+
+                    const QString name = attrMatch.captured("name").toLower();
+                    const QString value = attrMatch.captured("value");
+
+                    attrs.insert(name, value);
+                }
+
+                HtmlToken token;
+                token.type =
+                    isSelfClosing || selfClosingTags.contains(tagName)
+                    ? TokenType::SelfClosingTag
+                    : TokenType::StartTag;
+                token.name = tagName;
+
+                if (!attrs.isEmpty())
+                    token.attrs = attrs;
+
+                tokens.append(token);
+            }
+        }
+    }
+
+    return tokens;
+}
+
+
+QVector<HtmlNodePtr> HtmlParser::parseChildNodes(const QVector<HtmlToken> &tokens, int &pos, const QString &tagName) const
+{
+    QVector<HtmlNodePtr> nodes;
+
+    bool tagClosed = false;
+    while (pos < tokens.size() && !tagClosed) {
+        const HtmlToken &token = tokens.at(pos);
+
+        switch (token.type) {
+        case TokenType::Text: {
+            nodes.append(HtmlNode::makeText(token.content));
+            ++pos;
+            break;
+        }
+        case TokenType::StartTag: {
+            ++pos;
+            QVector<HtmlNodePtr> children = parseChildNodes(tokens, pos, token.name);
+            nodes.append(HtmlNode::makeElement(token.name, token.attrs, children));
+            break;
+        }
+        case TokenType::SelfClosingTag: {
+            nodes.append(HtmlNode::makeElement(token.name, token.attrs));
+            ++pos;
+            break;
+        }
+        case TokenType::EndTag: {
+            if (!tagName.isEmpty() && token.name == tagName) {
+                tagClosed = true;
+                ++pos;
+                break;
+            } else
+                // Unexpected closing tag -> ignore or warn
+                ++pos;
+            break;
+        }
+        default:
+            ;
+        }
+    }
+
+    return nodes;
+}
+
+void HtmlRenderContext::parseHeadNode(const HtmlNodePtr &headNode)
+{
+    for (const HtmlNodePtr &child : headNode->children) {
+        if (child->name == QStringLiteral("style")) {
+            for (const HtmlNodePtr &styleNode : child->children) {
+                const QString &styleText = styleNode->content;
+                parseCssRules(styleText);
+            }
+        } else if (child->name == QStringLiteral("meta")) {
+            const CssProperties &attrs = child->attrs;
+            if (attrs.contains(QStringLiteral("name")) && attrs.contains(QStringLiteral("content")))
+                m_metadata.insert(attrs.value("name"), attrs.value("content"));
+        }
+    }
+}
+
+CssProperties HtmlRenderContext::getStyleFor(const HtmlNodePtr &node) const
 {
     CssProperties style;
     if (m_rules.contains(node->name))
@@ -111,12 +280,6 @@ CssProperties HtmlRenderContext::getStyleFor(HtmlNodePtr node) const
         style.insert(parseInlineString(inlineStr));
 
     return style;
-}
-
-void HtmlRenderContext::clear()
-{
-    m_rules.clear();
-    m_metadata.clear();
 }
 
 CssProperties HtmlRenderContext::parseInlineString(const QString &styleStr)
@@ -140,6 +303,29 @@ CssProperties HtmlRenderContext::parseInlineString(const QString &styleStr)
     return attrs;
 }
 
+/*
+ * Parses a simple CSS string and inserts the properties into m_rules dictionary
+ * mapping individual selectors to their respective property dictionaries.
+ *
+ * Example:
+ *     Input:
+ *         "p { margin-top: 10px; color: red; } h1 { font-size: 20pt; }"
+ *     Output:
+ *         {
+ *             "p": {"margin-top": "10px", "color": "red"},
+ *             "h1": {"font-size": "20pt"}
+ *         }
+ *
+ * Handles grouped selectors like:
+ *     "p, li { margin-left: 0px; }"
+ * correctly as:
+ *     {
+ *         "p": {"margin-left": "0px"},
+ *         "li": {"margin-left": "0px"}
+ *    }
+ *
+ * It currently does not handle every legal edge case, for example semicolons inside quotes strings.
+ */
 void HtmlRenderContext::parseCssRules(const QString &cssText)
 {
     static const QRegularExpression rulePattern(R"(([^{]+)\{([^}]+)\})");
@@ -170,67 +356,42 @@ void HtmlRenderContext::parseCssRules(const QString &cssText)
     }
 }
 
-HtmlImporter::HtmlImporter(QTextDocument *document)
-    : m_document(document), m_cursor(nullptr)
+QTextDocument *HtmlRenderer::createDocument(const HtmlNodePtr &bodyNode, const HtmlRenderContext &context,
+                                            QObject *parent)
 {
-}
-
-void HtmlImporter::import(QString html)
-{
-    m_input = std::move(html);
-
-    // Parse input into tokens
-    QVector<HtmlToken> tokens = tokenize();
-
-    // Build syntax tree
-    QVector<HtmlNodePtr> nodes = parse(tokens);
-
-    HtmlNodePtr htmlNode = findNode(nodes, "html");
-    if (!htmlNode)
-        htmlNode = HtmlNode::ElementNodePtr("html", {}, nodes);
-
-    // Setup context for tag styles
-    m_context.clear();
-    HtmlNodePtr headNode = findNode(htmlNode, "head");
-    if (headNode)
-        extractContext(headNode);
-
-    HtmlNodePtr bodyNode = findNode(htmlNode, "body");
-    if (!bodyNode)
-        bodyNode = HtmlNode::ElementNodePtr("body", {}, nodes);
-
-    // Clear document
-    m_document->clear();
-    m_cursor = new QTextCursor(m_document);
+    QTextDocument *document = new QTextDocument(parent);
+    QTextCursor cursor(document);
 
     // Do not create an undo when creating the document from the input
-    m_document->setUndoRedoEnabled(false);
-
-    m_cursor->beginEditBlock();
-
-    m_blockFmt = defaultBlockFormat();
-    m_charFmt = defaultCharFormat();
-
-    m_atBeginning = true;
-    m_newParagraph = false;
-    m_newListItem = false;
-    m_indent = 0;
-    m_nestedUlTags = 0;
-    m_currentList = nullptr;
+    document->setUndoRedoEnabled(false);
+    cursor.beginEditBlock();
 
     // Traverse the syntax tree and render each node
-    renderNode(bodyNode);
-
-    m_cursor->endEditBlock();
+    HtmlRenderer renderer(&cursor, context);
+    renderer.renderNode(bodyNode);
 
     // Restore undoRedoEnabled
-    m_document->setUndoRedoEnabled(true);
+    cursor.endEditBlock();
+    document->setUndoRedoEnabled(true);
 
-    // Clean up
-    delete m_cursor;
+    return document;
 }
 
-void HtmlImporter::renderNode(const HtmlNodePtr &node)
+HtmlRenderer::HtmlRenderer(QTextCursor *cursor, const HtmlRenderContext &context)
+    : m_context(context),
+      m_cursor(cursor),
+      m_blockFmt(defaultBlockFormat()),
+      m_charFmt(defaultCharFormat()),
+      m_atBeginning(true),
+      m_newParagraph(false),
+      m_newListItem(false),
+      m_indent(0),
+      m_nestedUlTags(0),
+      m_currentList(nullptr)
+{
+}
+
+void HtmlRenderer::renderNode(const HtmlNodePtr &node)
 {
     if (node->type == NodeType::Text) {
         if (!node->content.isEmpty()) {
@@ -272,7 +433,7 @@ void HtmlImporter::renderNode(const HtmlNodePtr &node)
         if (!m_newParagraph) {
             finalizeBlock();
             insertBlock();
-        } else 
+        } else
             // # Don't add a new line if the paragraph just started
             // # Because a new line has already been added!
             m_newParagraph = false;
@@ -401,7 +562,7 @@ void HtmlImporter::renderNode(const HtmlNodePtr &node)
     }
 }
 
-void HtmlImporter::insertBlock()
+void HtmlRenderer::insertBlock()
 {
     // The first addNewLine called shouldn't add another block
     // Therefore this guard is necessary
@@ -422,7 +583,7 @@ void HtmlImporter::insertBlock()
     m_cursor->setCharFormat(m_charFmt);
 }
 
-void HtmlImporter::finalizeBlock()
+void HtmlRenderer::finalizeBlock()
 {
     // Set block format with indent and heading level before adding new block
     int listIndent = std::max<int>(0, m_nestedUlTags - 1);
@@ -430,7 +591,7 @@ void HtmlImporter::finalizeBlock()
     m_cursor->setBlockFormat(m_blockFmt);
 }
 
-void HtmlImporter::applyBlockFormatStyle(const CssProperties &style)
+void HtmlRenderer::applyBlockFormatStyle(const CssProperties &style)
 {
     // Define aliases
     using LineHeightType = QTextBlockFormat::LineHeightTypes;
@@ -440,8 +601,8 @@ void HtmlImporter::applyBlockFormatStyle(const CssProperties &style)
     // Left margin for blocks
     if (style.contains(QStringLiteral("left-margin"))) {
         // Parse a left-margin string (e.g., "10px", "-1.5em", "10") and return a pixel value.
-        // If the unit is "em", multiply the numeric value by default_font_size.
-        // If there's no unit or the unit is "px", return the value as a float.
+        // If the unit is "em", multiply the numeric value by defaultFontSize.
+        // If there's no unit or the unit is "px", set the value as a float.
         // ...
         const QString leftMarginStr = style.value(QStringLiteral("left-margin"));
 
@@ -450,17 +611,17 @@ void HtmlImporter::applyBlockFormatStyle(const CssProperties &style)
         if (match.hasMatch()) {
             bool ok = false;
             const qreal value = match.captured(1).toDouble(&ok);
-            if (!ok)
-                throw std::runtime_error("Unable to parse left-margin property");
-
-            const QString unit = match.captured(2);
-            if (unit == QStringLiteral("em"))
-                m_blockFmt.setProperty(QTextFormat::BlockLeftMargin, value * (qreal)defaultFontPointSize());
-            else
-                // Treat no unit or "px" as pixels.
-                m_blockFmt.setProperty(QTextFormat::BlockLeftMargin, value);
+            if (ok) {
+                const QString unit = match.captured(2);
+                if (unit == QStringLiteral("em"))
+                    m_blockFmt.setProperty(QTextFormat::BlockLeftMargin, value * (qreal)defaultFontPointSize());
+                else
+                    // Treat no unit or "px" as pixels.
+                    m_blockFmt.setProperty(QTextFormat::BlockLeftMargin, value);
+            } else
+                qWarning("Unable to parse left-margin property");
         } else
-            throw std::runtime_error("Unable to parse left-margin property");
+            qWarning("Unable to parse left-margin property");
     }
 
     // Qt block indent
@@ -472,12 +633,12 @@ void HtmlImporter::applyBlockFormatStyle(const CssProperties &style)
         if (match.hasMatch()) {
             bool ok = false;
             const int indent = match.captured(1).toInt(&ok);
-            if (!ok)
-                throw std::runtime_error("Unable to parse -qt-block-indent property");
-
-            m_indent = indent;
+            if (ok)
+                m_indent = indent;
+            else
+                qWarning("Unable to parse -qt-block-indent property");
         } else
-            throw std::runtime_error("Unable to parse -qt-block-indent property");
+            qWarning("Unable to parse -qt-block-indent property");
     }
 
     // Line height
@@ -489,16 +650,16 @@ void HtmlImporter::applyBlockFormatStyle(const CssProperties &style)
         if (match.hasMatch()) {
             bool ok = false;
             const qreal value = match.captured(1).toDouble(&ok);
-            if (!ok)
-                throw std::runtime_error("Unable to parse line-height property");
-
-            if (match.captured(2) == QStringLiteral("%")) {
-                m_blockFmt.setProperty(QTextFormat::LineHeightType, ProportionalHeight);
-                m_blockFmt.setProperty(QTextFormat::LineHeight, value);
-            } else {
-                m_blockFmt.setProperty(QTextFormat::LineHeightType, FixedHeight);
-                m_blockFmt.setProperty(QTextFormat::LineHeight, value);
-            }
+            if (ok) {
+                if (match.captured(2) == QStringLiteral("%")) {
+                    m_blockFmt.setProperty(QTextFormat::LineHeightType, ProportionalHeight);
+                    m_blockFmt.setProperty(QTextFormat::LineHeight, value);
+                } else {
+                    m_blockFmt.setProperty(QTextFormat::LineHeightType, FixedHeight);
+                    m_blockFmt.setProperty(QTextFormat::LineHeight, value);
+                }
+            } else
+                qWarning("Unable to parse line-height property");
         } else if (lineHeightStr == QStringLiteral("normal")) {
             m_blockFmt.setProperty(QTextFormat::LineHeightType, defaultBlockFormat().lineHeightType());
             m_blockFmt.setProperty(QTextFormat::LineHeight, defaultBlockFormat().lineHeight());
@@ -506,167 +667,45 @@ void HtmlImporter::applyBlockFormatStyle(const CssProperties &style)
             m_blockFmt.clearProperty(QTextFormat::LineHeightType);
             m_blockFmt.clearProperty(QTextFormat::LineHeight);
         } else
-            throw std::runtime_error("Unable to parse line-height property");
+            qWarning("Unable to parse line-height property");
     }
 }
 
-QVector<HtmlToken> HtmlImporter::tokenize() const
+QTextDocument *HtmlImporter::createDocument(const QString &html, QObject *parent)
 {
-    static const QRegularExpression tagPattern(R"((?<tag><[^>]+>)|(?<text>[^<]+))");
-    static const QRegularExpression attrPattern(
-        R"regex((?<name>[a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?<quote>["'])(?<value>.*?)\k<quote>)regex"
-    );
-    static const QSet<QString> selfClosingTags = {"br", "img", "hr", "meta"};
+    // Build syntax tree
+    QVector<HtmlNodePtr> nodes = HtmlParser::parse(html);
 
-    QVector<HtmlToken> tokens;
+    // Find <html> tag
+    HtmlNodePtr htmlNode = findNode(nodes, "html");
+    if (!htmlNode)
+        // Put everything inside an <html>...</html> tag
+        htmlNode = HtmlNode::makeElement("html", {}, nodes);
 
-    auto it = tagPattern.globalMatch(m_input);
-    while (it.hasNext()) {
-        QRegularExpressionMatch match = it.next();
+    // Setup context for tag styles
+    HtmlRenderContext context;
+    HtmlNodePtr headNode = findNode(htmlNode, "head");
+    if (headNode)
+        context.parseHeadNode(headNode);
 
-        const QString tag = match.captured("tag");
-        const QString text = match.captured("text");
+    HtmlNodePtr bodyNode = findNode(htmlNode, "body");
+    if (!bodyNode)
+        bodyNode = HtmlNode::makeElement("body", {}, nodes);
 
-        if (!text.isEmpty()) {
-            if (QString(text).remove('\n').trimmed().isEmpty())
-                continue;
-
-            HtmlToken token;
-            token.type = TokenType::Text;
-            token.content = htmlUnescape(text);
-
-            tokens.append(token);
-        }
-        else if (!tag.isEmpty()) {
-            if (tag.startsWith("</")) {
-                // End tag
-                const QString tagName = tag.mid(2, tag.length() - 3)
-                                           .trimmed()
-                                           .toLower();
-
-                HtmlToken token;
-                token.type = TokenType::EndTag;
-                token.name = tagName;
-
-                tokens.append(token);
-            }
-            else {
-                const bool isSelfClosing = tag.endsWith("/>");
-
-                QString tagContent;
-                if (isSelfClosing)
-                    tagContent = tag.mid(1, tag.length() - 3).trimmed();
-                else
-                    tagContent = tag.mid(1, tag.length() - 2).trimmed();
-
-                QString tagName;
-                QString attrString;
-
-                const int firstSpace = tagContent.indexOf(QRegularExpression(R"(\s)"));
-
-                if (firstSpace < 0)
-                    tagName = tagContent.toLower();
-                else {
-                    tagName = tagContent.left(firstSpace).toLower();
-                    attrString = tagContent.mid(firstSpace + 1).trimmed();
-                }
-
-                CssProperties attrs;
-
-                auto attrIt = attrPattern.globalMatch(attrString);
-                while (attrIt.hasNext()) {
-                    QRegularExpressionMatch attrMatch = attrIt.next();
-
-                    const QString name = attrMatch.captured("name").toLower();
-                    const QString value = attrMatch.captured("value");
-
-                    attrs.insert(name, value);
-                }
-
-                HtmlToken token;
-                token.type =
-                    isSelfClosing || selfClosingTags.contains(tagName)
-                    ? TokenType::SelfClosingTag
-                    : TokenType::StartTag;
-                token.name = tagName;
-
-                if (!attrs.isEmpty())
-                    token.attrs = attrs;
-
-                tokens.append(token);
-            }
-        }
-    }
-
-    return tokens;
+    return HtmlRenderer::createDocument(bodyNode, context, parent);
 }
 
-QVector<HtmlNodePtr> HtmlImporter::parse(const QVector<HtmlToken> &tokens) const
-{
-    int pos = 0;
-    return parseChildNodes(tokens, pos);
-}
-
-QVector<HtmlNodePtr> HtmlImporter::parseChildNodes(const QVector<HtmlToken> &tokens, int &pos, const QString &tagName) const
-{
-    QVector<HtmlNodePtr> nodes;
-
-    bool tagClosed = false;
-    while (pos < tokens.size() && !tagClosed) {
-        const HtmlToken &token = tokens.at(pos);
-
-        switch (token.type) {
-        case TokenType::Text: {
-            nodes.append(HtmlNode::TextNodePtr(token.content));
-            ++pos;
-            break;
-        }
-        case TokenType::StartTag: {
-            ++pos;
-            QVector<HtmlNodePtr> children = parseChildNodes(tokens, pos, token.name);
-            nodes.append(HtmlNode::ElementNodePtr(token.name, token.attrs, children));
-            break;
-        }
-        case TokenType::SelfClosingTag: {
-            nodes.append(HtmlNode::ElementNodePtr(token.name, token.attrs));
-            ++pos;
-            break;
-        }
-        case TokenType::EndTag: {
-            if (!tagName.isEmpty() && token.name == tagName) {
-                tagClosed = true;
-                ++pos;
-                break;
-            } else
-                // Unexpected closing tag -> ignore or warn
-                ++pos;
-            break;
-        }
-        default:
-            ;
-        }
-    }
-
-    return nodes;
-}
-
-void HtmlImporter::extractContext(HtmlNodePtr headNode)
-{
-    for (const HtmlNodePtr &child : headNode->children) {
-        if (child->name == QStringLiteral("style")) {
-            for (const HtmlNodePtr &styleNode : child->children) {
-                const QString &styleText = styleNode->content;
-                m_context.insertStyle(styleText);
-            }
-        } else if (child->name == QStringLiteral("meta")) {
-            const CssProperties &attrs = child->attrs;
-            if (attrs.contains(QStringLiteral("name")) && attrs.contains(QStringLiteral("content")))
-                m_context.insertMetadata(attrs.value("name"), attrs.value("content"));
-        }
-    }
-}
-
-HtmlNodePtr HtmlImporter::findNode(HtmlNodePtr root, const QString &tagName)
+/*
+ * findNode recursively searches for a node with the given tag name in the AST.
+ *
+ * Parameters:
+ *     root (HtmlNodePtr): The root of the AST or a list of nodes.
+ *     tagName (QString): The tag name to search for (case-insensitive).
+ *
+ * Returns:
+ *     HtmlNodePtr: The first node matching the tag name, or nullptr if not found.
+ */
+HtmlNodePtr HtmlImporter::findNode(const HtmlNodePtr &root, const QString &tagName)
 {
     // Check if the current node matches the tag (case-insensitive).
     if (!root->name.isEmpty() && root->name.toLower() == tagName.toLower())

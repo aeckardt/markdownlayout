@@ -1,11 +1,13 @@
 #ifndef HTMLEXPORTER_H
 #define HTMLEXPORTER_H
 
-#include <QMap>
+#include <QHash>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QString>
 #include <QVector>
+
+#include "htmlstyle.h"
 
 class HtmlExporter {
 public:
@@ -24,9 +26,9 @@ private:
 
     struct Tag {
         QString name;
-        QMap<QString, QString> attrs;
+        CssProperties attrs;
 
-        inline Tag(const QString &name, const QMap<QString, QString> &attrs = {})
+        inline Tag(const QString &name, const CssProperties &attrs = {})
             : name(name), attrs(attrs)
         {}
     };

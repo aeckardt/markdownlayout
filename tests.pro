@@ -28,7 +28,8 @@ HEADERS += \
     src/texteditor/markdownexporter.h \
     src/texteditor/markdownimporter.h \
     src/texteditor/markdowninlineparser.h \
-    src/texteditor/texteditorstyle.h
+    src/texteditor/texteditorstyle.h \
+    src/texteditor/texteditorstyle_config.h
 
 INCLUDEPATH += \
     src \

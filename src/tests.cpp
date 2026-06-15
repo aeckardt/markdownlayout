@@ -43,18 +43,12 @@ int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
 
-    QTextDocument document, newDocument;
-    MarkdownImporter importer(&document);
-
-    importer.import(QString(MARKDOWN_STRING));
-
-    QString exported = HtmlExporter::exportDocument(&document);
-
-    HtmlImporter htmlImporter(&newDocument);
-    htmlImporter.import(exported);
+    QTextDocument *document = MarkdownImporter::createDocument(MARKDOWN_STRING, &app);
+    QString exported = HtmlExporter::exportDocument(document);
+    QTextDocument *newDocument = HtmlImporter::createDocument(exported, &app);
 
     MainWindow wnd;
-    wnd.setDocument(&newDocument);
+    wnd.setDocument(newDocument);
     wnd.show();
 
     return app.exec();

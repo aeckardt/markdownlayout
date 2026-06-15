@@ -12,144 +12,22 @@
 
 using namespace TextEditorStyle;
 
-MarkdownImporter::MarkdownImporter(QTextDocument *document)
-    : m_document(document)
+
+QVector<MarkdownBlockToken> MarkdownParser::parse(const QString &markdown)
 {
+    MarkdownParser parser;
+    return parser.parseBlocks(markdown);
 }
 
-void MarkdownImporter::import(QString markdown)
+QVector<MarkdownBlockToken> MarkdownParser::parseBlocks(const QString &markdown) const
 {
-    m_input = std::move(markdown);
-
-    QVector<BlockToken> tokens = parseBlocks(m_input);
-    m_document->clear();
-    QTextCursor cursor(m_document);
-
-    m_document->setUndoRedoEnabled(false);
-    cursor.beginEditBlock();
-
-    m_blockFormat = defaultBlockFormat();
-    m_charFormat = defaultCharFormat();
-    m_atBeginning = true;
-    m_currentList = nullptr;
-
-    renderBlocks(cursor, tokens);
-
-    cursor.endEditBlock();
-    m_document->setUndoRedoEnabled(true);
-}
-
-void MarkdownImporter::renderBlocks(QTextCursor &cursor, const QVector<BlockToken> &tokens)
-{
-    for (const auto &token : tokens) {
-        if (!m_atBeginning)
-            newLine(cursor);
-        else
-            m_atBeginning = false;
-
-        if (token.type == BlockToken::Type::ListItem) {
-            cursor.insertText(listPadding(), defaultCharFormat());
-
-            if (!m_currentList) {
-                if (cursor.currentList())
-                    m_currentList = cursor.currentList();
-                else
-                    m_currentList = cursor.createList(QTextListFormat::ListDisc);
-            }
-
-            m_blockFormat.setObjectIndex(m_currentList->objectIndex());
-            m_blockFormat.setIndent(token.level);
-            m_blockFormat.setProperty(QTextFormat::ListStyle,
-                                      token.level > 0 ? LowerLevelListStyle : TopLevelListStyle);
-            m_currentList->add(cursor.block());
-        } else if (token.type == BlockToken::Type::Heading) {
-            m_blockFormat.setHeadingLevel(token.level);
-            m_charFormat.setFontWeight(HeadingFontWeight);
-            m_charFormat.setProperty(QTextFormat::FontSizeAdjustment, 4 - token.level);
-        } else if (token.type == BlockToken::Type::HorizontalRule) {
-            m_blockFormat.setProperty(QTextFormat::BlockTrailingHorizontalRulerWidth, horizontalRulerWidth());
-            if (horizontalRulerColor().isValid())
-                m_blockFormat.setProperty(QTextFormat::BackgroundBrush, horizontalRulerColor());
-        }
-
-        if (!token.children.isEmpty())
-            renderInlines(cursor, token.children);
-
-        if (token.type == BlockToken::Type::Heading) {
-            m_charFormat.setFontWeight(NormalFontWeight);
-            m_charFormat.clearProperty(QTextFormat::FontSizeAdjustment);
-        }
-
-        endLine(cursor);
-    }
-}
-
-void MarkdownImporter::renderInlines(QTextCursor &cursor, const QVector<InlineNodePtr> &nodes)
-{
-    auto applyNodeStyle = [&](InlineNodePtr node, QTextCharFormat &fmt) {
-        switch (node->type) {
-        case NodeType::Strong:
-            fmt.setFontWeight(StrongFontWeight);
-            break;
-        case NodeType::Emph:
-            fmt.setFontItalic(true);
-            break;
-        case NodeType::InlineLink:
-            fmt.setAnchor(true);
-            fmt.setAnchorHref(node->attrs.value(QStringLiteral("href")).toString());
-            fmt.setForeground(linkColor());
-            break;
-        case NodeType::HtmlTag:
-            if (node->content == QStringLiteral("ins")) {
-                fmt.setFontUnderline(true);
-            } else if (node->content == QStringLiteral("span")) {
-                const QString style = node->attrs.value(QStringLiteral("style")).toString();
-                if (!style.isEmpty())
-                    applyHtmlStyle(parseProperties(style), fmt);
-            }
-            break;
-        default:
-            break;
-        }
-    };
-
-    for (const auto &node : nodes) {
-        if (node->type == InlineNode::Type::Text) {
-            cursor.insertText(node->content, m_charFormat);
-        } else if (!node->children.isEmpty()) {
-            const QTextCharFormat old = m_charFormat;
-            applyNodeStyle(node, m_charFormat);
-            cursor.setCharFormat(m_charFormat);
-            renderInlines(cursor, node->children);
-            m_charFormat = old;
-            cursor.setCharFormat(m_charFormat);
-        }
-    }
-}
-
-void MarkdownImporter::newLine(QTextCursor &cursor)
-{
-    cursor.insertBlock();
-    m_blockFormat = defaultBlockFormat();
-    m_charFormat = defaultCharFormat();
-    cursor.setCharFormat(m_charFormat);
-}
-
-void MarkdownImporter::endLine(QTextCursor &cursor)
-{
-    cursor.setBlockFormat(m_blockFormat);
-    cursor.setCharFormat(m_charFormat);
-}
-
-QVector<BlockToken> MarkdownImporter::parseBlocks(const QString &markdown)
-{
-    QVector<BlockToken> tokens;
+    QVector<MarkdownBlockToken> tokens;
     for (const QString &line : markdown.split(QLatin1Char('\n')))
         tokens.append(parseBlockLine(line.endsWith(QLatin1Char('\r')) ? line.left(line.size() - 1) : line));
     return tokens;
 }
 
-BlockToken MarkdownImporter::parseBlockLine(const QString &line)
+MarkdownBlockToken MarkdownParser::parseBlockLine(const QString &line) const
 {
     static const QRegularExpression headingRe(QStringLiteral("^(#{1,4})\\s+(.*)"));
     static const QRegularExpression unorderedListRe(QStringLiteral("^[-*]\\s+(.*)"));
@@ -161,28 +39,168 @@ BlockToken MarkdownImporter::parseBlockLine(const QString &line)
 
     auto headingMatch = headingRe.match(stripped);
     if (headingMatch.hasMatch()) {
-        return {BlockToken::Type::Heading,
+        return {MarkdownBlockToken::Type::Heading,
                 int(headingMatch.captured(1).size()),
                 parseInline(headingMatch.captured(2))};
     }
 
     auto listMatch = unorderedListRe.match(stripped);
     if (listMatch.hasMatch()) {
-        return {BlockToken::Type::ListItem,
+        return {MarkdownBlockToken::Type::ListItem,
                 int(indent / 2),
                 parseInline(listMatch.captured(1))};
     }
 
     if (stripped == QStringLiteral("---"))
-        return {BlockToken::Type::HorizontalRule, 0, {}};
+        return {MarkdownBlockToken::Type::HorizontalRule, 0, {}};
 
     if (stripped.isEmpty())
-        return {BlockToken::Type::Blank, 0, {}};
+        return {MarkdownBlockToken::Type::Blank, 0, {}};
 
-    return {BlockToken::Type::Paragraph, 0, parseInline(line)};
+    return {MarkdownBlockToken::Type::Paragraph, 0, parseInline(line)};
 }
 
-QVector<InlineNodePtr> MarkdownImporter::parseInline(const QString &text)
+QVector<InlineNodePtr> MarkdownParser::parseInline(const QString &text) const
 {
     return MarkdownInlineParser(text).astRoot()->children;
+}
+
+QTextDocument *MarkdownRenderer::createDocument(const QVector<MarkdownBlockToken> &tokens, QObject *parent)
+{
+    QTextDocument *document = new QTextDocument(parent);
+    QTextCursor cursor(document);
+
+    // Do not create an undo when creating the document from the input
+    document->setUndoRedoEnabled(false);
+    cursor.beginEditBlock();
+
+    // Traverse the syntax tree and render each token / inlinenode
+    MarkdownRenderer renderer(&cursor);
+    renderer.renderBlocks(tokens);
+
+    // Restore undoRedoEnabled
+    cursor.endEditBlock();
+    document->setUndoRedoEnabled(true);
+
+    return document;
+}
+
+MarkdownRenderer::MarkdownRenderer(QTextCursor *cursor)
+    : m_cursor(cursor),
+      m_blockFormat(defaultBlockFormat()),
+      m_charFormat(defaultCharFormat()),
+      m_atBeginning(true),
+      m_currentList(nullptr)
+{
+}
+
+void MarkdownRenderer::renderBlocks(const QVector<MarkdownBlockToken> &tokens)
+{
+    for (const auto &token : tokens) {
+        if (!m_atBeginning)
+            insertBlock();
+        else
+            m_atBeginning = false;
+
+        if (token.type == TokenType::ListItem) {
+            m_cursor->insertText(listPadding(), defaultCharFormat());
+
+            if (!m_currentList) {
+                if (m_cursor->currentList())
+                    m_currentList = m_cursor->currentList();
+                else
+                    m_currentList = m_cursor->createList(QTextListFormat::ListDisc);
+            }
+
+            m_blockFormat.setObjectIndex(m_currentList->objectIndex());
+            m_blockFormat.setIndent(token.level);
+            m_blockFormat.setProperty(QTextFormat::ListStyle,
+                                      token.level > 0 ? LowerLevelListStyle : TopLevelListStyle);
+            m_currentList->add(m_cursor->block());
+        } else if (token.type == TokenType::Heading) {
+            m_blockFormat.setHeadingLevel(token.level);
+            m_charFormat.setFontWeight(HeadingFontWeight);
+            m_charFormat.setProperty(QTextFormat::FontSizeAdjustment, 4 - token.level);
+        } else if (token.type == TokenType::HorizontalRule) {
+            m_blockFormat.setProperty(QTextFormat::BlockTrailingHorizontalRulerWidth, horizontalRulerWidth());
+            if (horizontalRulerColor().isValid())
+                m_blockFormat.setProperty(QTextFormat::BackgroundBrush, horizontalRulerColor());
+        }
+
+        if (!token.children.isEmpty())
+            renderInlines(token.children);
+
+        if (token.type == TokenType::Heading) {
+            m_charFormat.setFontWeight(NormalFontWeight);
+            m_charFormat.clearProperty(QTextFormat::FontSizeAdjustment);
+        }
+
+        finalizeBlock();
+    }
+}
+
+void MarkdownRenderer::renderInlines(const QVector<InlineNodePtr> &nodes)
+{
+    for (const auto &node : nodes) {
+        if (node->type == NodeType::Text)
+            m_cursor->insertText(node->content, m_charFormat);
+        // TODO: Handle other types?!
+        else if (!node->children.isEmpty()) {
+            const QTextCharFormat oldFmt(m_charFormat);
+            applyNodeStyle(node, m_charFormat);
+            m_cursor->setCharFormat(m_charFormat);
+            renderInlines(node->children);
+            m_charFormat = oldFmt;
+            m_cursor->setCharFormat(m_charFormat);
+        }
+    }
+}
+
+void MarkdownRenderer::insertBlock()
+{
+    m_cursor->insertBlock();
+    m_blockFormat = defaultBlockFormat();
+    m_charFormat = defaultCharFormat();
+    m_cursor->setCharFormat(m_charFormat);
+}
+
+void MarkdownRenderer::finalizeBlock()
+{
+    m_cursor->setBlockFormat(m_blockFormat);
+    m_cursor->setCharFormat(m_charFormat);
+}
+
+void MarkdownRenderer::applyNodeStyle(InlineNodePtr node, QTextCharFormat &fmt) const
+{
+    switch (node->type) {
+    case NodeType::Strong:
+        fmt.setFontWeight(StrongFontWeight);
+        break;
+    case NodeType::Emph:
+        fmt.setFontItalic(true);
+        break;
+    case NodeType::InlineLink:
+        fmt.setAnchor(true);
+        fmt.setAnchorHref(node->attrs.value(QStringLiteral("href")).toString());
+        fmt.setForeground(linkColor());
+        break;
+    case NodeType::HtmlTag:
+        if (node->content == QStringLiteral("ins")) {
+            fmt.setFontUnderline(true);
+        } else if (node->content == QStringLiteral("span")) {
+            const QString style = node->attrs.value(QStringLiteral("style")).toString();
+            if (!style.isEmpty())
+                applyHtmlStyle(parseProperties(style), fmt);
+        }
+        break;
+    default:
+        break;
+    }
+};
+
+
+QTextDocument *MarkdownImporter::createDocument(const QString &markdown, QObject *parent)
+{
+    QVector<MarkdownBlockToken> tokens = MarkdownParser::parse(markdown);
+    return MarkdownRenderer::createDocument(tokens, parent);
 }

@@ -3,8 +3,9 @@
 
 #include <QMap>
 #include <QString>
+#include <QVariant>
 #include <QVector>
-#include <QSharedPointer>
+#include <memory>
 
 struct InlineNode;
 typedef std::shared_ptr<InlineNode> InlineNodePtr;
@@ -55,8 +56,8 @@ struct InlineHtmlTag {
     QString tag;      // "ins", "span", ...
     QMap<QString, QVariant> attrs;
 
-    inline InlineHtmlTag() {}
-    inline InlineHtmlTag(QString content, QString tag, QMap<QString, QVariant> attrs = {})
+    InlineHtmlTag() {}
+    InlineHtmlTag(QString content, QString tag, QMap<QString, QVariant> attrs = {})
         : content(content), tag(tag), attrs(attrs) {}
 };
 
@@ -124,9 +125,9 @@ private:
 
 class MarkdownInlineParser {
 public:
-    explicit MarkdownInlineParser(QString input = {});
+    explicit MarkdownInlineParser(const QString &input = {});
 
-    inline const InlineNodePtr astRoot() const { return m_astRoot; }
+    const InlineNodePtr astRoot() const { return m_astRoot; }
 
 private:
     void parse();

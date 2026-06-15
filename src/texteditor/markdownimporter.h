@@ -9,7 +9,7 @@
 #include <QTextList>
 #include <memory>
 
-struct BlockToken
+struct MarkdownBlockToken
 {
     enum class Type {
         Heading,
@@ -23,31 +23,53 @@ struct BlockToken
     QVector<InlineNodePtr> children;
 };
 
-class MarkdownImporter
+class MarkdownParser
 {
 public:
-    explicit MarkdownImporter(QTextDocument *document);
-
-    void import(QString markdown);
+    static QVector<MarkdownBlockToken> parse(const QString &markdown);
 
 private:
-    QVector<BlockToken> parseBlocks(const QString &markdown);
-    BlockToken parseBlockLine(const QString &line);
-    QVector<InlineNodePtr> parseInline(const QString &text);
-    void renderBlocks(QTextCursor &cursor, const QVector<BlockToken> &tokens);
-    void renderInlines(QTextCursor &cursor, const QVector<InlineNodePtr> &nodes);
-    void newLine(QTextCursor &cursor);
-    void endLine(QTextCursor &cursor);
+    MarkdownParser() {}
 
-    QTextDocument *m_document;
+    QVector<MarkdownBlockToken> parseBlocks(const QString &markdown) const;
+    MarkdownBlockToken parseBlockLine(const QString &line) const;
+    QVector<InlineNodePtr> parseInline(const QString &text) const;
+};
 
-    QString m_input;
+class MarkdownRenderer
+{
+public:
+    static QTextDocument *createDocument(const QVector<MarkdownBlockToken> &tokens, QObject *parent = nullptr);
+
+private:
+    explicit MarkdownRenderer(QTextCursor *cursor);
+
+    // Render state variables
+    QTextCursor *m_cursor;
     QTextBlockFormat m_blockFormat;
     QTextCharFormat m_charFormat;
     bool m_atBeginning = true;
     QTextList *m_currentList = nullptr;
 
+    // Render functions
+    void renderBlocks(const QVector<MarkdownBlockToken> &tokens);
+    void renderInlines(const QVector<InlineNodePtr> &nodes);
+    void insertBlock();
+    void finalizeBlock();
+
+    void applyNodeStyle(InlineNodePtr node, QTextCharFormat &fmt) const;
+
+    using TokenType = MarkdownBlockToken::Type;
     using NodeType = InlineNode::Type;
+};
+
+class MarkdownImporter
+{
+public:
+    static QTextDocument *createDocument(const QString &markdown, QObject *parent = nullptr);
+
+private:
+    explicit MarkdownImporter() {}
 };
 
 #endif

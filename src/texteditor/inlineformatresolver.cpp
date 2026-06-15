@@ -75,14 +75,15 @@ void InlineFormatResolver::resolveChangeStack()
             // Does the next closing format match the last opened format?
             while (lastOpenFmt.type != closeFmt.type) {
                 // If they don't match, close the last opened format
-                fragment.formatChanges.append({ lastOpenFmt.type, lastOpenFmt.attrs, false });
+                fragment.formatChanges.append({lastOpenFmt.type, lastOpenFmt.attrs, false});
                 if (lastOpenFmt.end > index)
                     // Update start index of last opened format
                     // Thus, it will be re-opened in the next iteration
                     lastOpenFmt.start = index + 1;
+                // TODO: Review this code here
                 lastOpenFmt = openStack.takeLast();
             }
-            fragment.formatChanges.append({ closeFmt.type, closeFmt.attrs, false });
+            fragment.formatChanges.append({closeFmt.type, closeFmt.attrs, false});
         }
     }
 }

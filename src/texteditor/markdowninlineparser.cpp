@@ -122,7 +122,7 @@ void ScopeMarker::clearNode()
     m_node.reset();
 }
 
-MarkdownInlineParser::MarkdownInlineParser(QString input)
+MarkdownInlineParser::MarkdownInlineParser(const QString &input)
     : m_input(input),
       m_astRoot(new InlineNode(NodeType::Container)),
       m_currentParent(nullptr)

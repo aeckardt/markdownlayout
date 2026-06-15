@@ -1,7 +1,10 @@
-#include "texteditor/texteditorstyle.h"
+#include "texteditorstyle.h"
+#include "texteditorstyle_config.h"
 
 #include <QGuiApplication>
+#include <QTextBlock>
 #include <QTextBlockFormat>
+#include <QTextCharFormat>
 
 namespace TextEditorStyle {
 
@@ -31,8 +34,6 @@ const QTextBlockFormat &defaultBlockFormat()
 {
     // Define aliases
     using LineHeightType = QTextBlockFormat::LineHeightTypes;
-//    using ProportionalHeight = LineHeightType::ProportionalHeight;
-//    using FixedHeight = LineHeightType::FixedHeight;
 
     static QTextBlockFormat blockFmt;
     static bool init = false;
