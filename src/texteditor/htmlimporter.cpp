@@ -1,12 +1,12 @@
 #include "htmlimporter.h"
+#include "htmlimporter_p.h"
 #include "htmlstyle.h"
 #include "texteditorstyle.h"
 
 #include <QRegularExpression>
-#include <QScopeGuard>
-#include <QStringView>
+#include <QSet>
 #include <QTextCursor>
-#include <QTextDocumentFragment>
+#include <QTextDocument>
 #include <QTextList>
 
 using namespace TextEditorStyle;
@@ -114,6 +114,43 @@ QVector<HtmlNodePtr> HtmlParser::parse(const QString &html)
     // It might not be a tree in a strict sense
     // but rather an array of roots
     return parser.parseChildNodes(tokens, pos);
+}
+
+/*
+ * findNode recursively searches for a node with the given tag name in the AST.
+ *
+ * Parameters:
+ *     root (HtmlNodePtr): The root of the AST or a list of nodes.
+ *     tagName (QString): The tag name to search for (case-insensitive).
+ *
+ * Returns:
+ *     HtmlNodePtr: The first node matching the tag name, or nullptr if not found.
+ */
+HtmlNodePtr HtmlParser::findNode(const HtmlNodePtr &root, const QString &tagName)
+{
+    // Check if the current node matches the tag (case-insensitive).
+    if (!root->name.isEmpty() && root->name.toLower() == tagName.toLower())
+        return root;
+
+    // Otherwise, search recursively in the children.
+    for (const HtmlNodePtr &child : root->children) {
+        HtmlNodePtr result = findNode(child, tagName);
+        if (result)
+            return result;
+    }
+
+    return {};
+}
+
+HtmlNodePtr HtmlParser::findNode(const QList<HtmlNodePtr> &nodes, const QString &tagName)
+{
+    for (const HtmlNodePtr &node : nodes) {
+        HtmlNodePtr result = findNode(node, tagName);
+        if (result)
+            return result;
+    }
+
+    return {};
 }
 
 QVector<HtmlToken> HtmlParser::tokenize() const
@@ -389,6 +426,7 @@ HtmlRenderer::HtmlRenderer(QTextCursor *cursor, const HtmlRenderContext &context
       m_nestedUlTags(0),
       m_currentList(nullptr)
 {
+    Q_ASSERT(m_cursor);
 }
 
 void HtmlRenderer::renderNode(const HtmlNodePtr &node)
@@ -671,63 +709,28 @@ void HtmlRenderer::applyBlockFormatStyle(const CssProperties &style)
     }
 }
 
-QTextDocument *HtmlImporter::createDocument(const QString &html, QObject *parent)
+QTextDocument *documentFromHtml(const QString &html, QObject *parent)
 {
     // Build syntax tree
     QVector<HtmlNodePtr> nodes = HtmlParser::parse(html);
 
     // Find <html> tag
-    HtmlNodePtr htmlNode = findNode(nodes, "html");
+    HtmlNodePtr htmlNode = HtmlParser::findNode(nodes, "html");
     if (!htmlNode)
-        // Put everything inside an <html>...</html> tag
+        // Put everything inside <html>...</html> tag
         htmlNode = HtmlNode::makeElement("html", {}, nodes);
 
     // Setup context for tag styles
     HtmlRenderContext context;
-    HtmlNodePtr headNode = findNode(htmlNode, "head");
+    HtmlNodePtr headNode = HtmlParser::findNode(htmlNode, "head");
     if (headNode)
         context.parseHeadNode(headNode);
 
-    HtmlNodePtr bodyNode = findNode(htmlNode, "body");
+    // Find <body> tag
+    HtmlNodePtr bodyNode = HtmlParser::findNode(htmlNode, "body");
     if (!bodyNode)
+        // Create bodyNode as root for parsing
         bodyNode = HtmlNode::makeElement("body", {}, nodes);
 
     return HtmlRenderer::createDocument(bodyNode, context, parent);
-}
-
-/*
- * findNode recursively searches for a node with the given tag name in the AST.
- *
- * Parameters:
- *     root (HtmlNodePtr): The root of the AST or a list of nodes.
- *     tagName (QString): The tag name to search for (case-insensitive).
- *
- * Returns:
- *     HtmlNodePtr: The first node matching the tag name, or nullptr if not found.
- */
-HtmlNodePtr HtmlImporter::findNode(const HtmlNodePtr &root, const QString &tagName)
-{
-    // Check if the current node matches the tag (case-insensitive).
-    if (!root->name.isEmpty() && root->name.toLower() == tagName.toLower())
-        return root;
-
-    // Otherwise, search recursively in the children.
-    for (const HtmlNodePtr &child : root->children) {
-        HtmlNodePtr result = findNode(child, tagName);
-        if (result)
-            return result;
-    }
-
-    return {};
-}
-
-HtmlNodePtr HtmlImporter::findNode(const QVector<HtmlNodePtr> &nodes, const QString &tagName)
-{
-    for (const HtmlNodePtr &node : nodes) {
-        HtmlNodePtr result = findNode(node, tagName);
-        if (result)
-            return result;
-    }
-
-    return {};
 }

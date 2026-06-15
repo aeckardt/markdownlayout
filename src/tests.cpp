@@ -43,9 +43,9 @@ int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
 
-    QTextDocument *document = MarkdownImporter::createDocument(MARKDOWN_STRING, &app);
+    QTextDocument *document = documentFromMarkdown(MARKDOWN_STRING, &app);
     QString exported = HtmlExporter::exportDocument(document);
-    QTextDocument *newDocument = HtmlImporter::createDocument(exported, &app);
+    QTextDocument *newDocument = documentFromHtml(exported, &app);
 
     MainWindow wnd;
     wnd.setDocument(newDocument);

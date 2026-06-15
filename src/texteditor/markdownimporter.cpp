@@ -1,4 +1,5 @@
 #include "texteditor/markdownimporter.h"
+#include "texteditor/markdownimporter_p.h"
 #include "texteditor/htmlstyle.h"
 #include "texteditor/texteditorstyle.h"
 
@@ -12,14 +13,12 @@
 
 using namespace TextEditorStyle;
 
-
 QVector<MarkdownBlockToken> MarkdownParser::parse(const QString &markdown)
 {
-    MarkdownParser parser;
-    return parser.parseBlocks(markdown);
+    return MarkdownParser::parseBlocks(markdown);
 }
 
-QVector<MarkdownBlockToken> MarkdownParser::parseBlocks(const QString &markdown) const
+QVector<MarkdownBlockToken> MarkdownParser::parseBlocks(const QString &markdown)
 {
     QVector<MarkdownBlockToken> tokens;
     for (const QString &line : markdown.split(QLatin1Char('\n')))
@@ -27,7 +26,7 @@ QVector<MarkdownBlockToken> MarkdownParser::parseBlocks(const QString &markdown)
     return tokens;
 }
 
-MarkdownBlockToken MarkdownParser::parseBlockLine(const QString &line) const
+MarkdownBlockToken MarkdownParser::parseBlockLine(const QString &line)
 {
     static const QRegularExpression headingRe(QStringLiteral("^(#{1,4})\\s+(.*)"));
     static const QRegularExpression unorderedListRe(QStringLiteral("^[-*]\\s+(.*)"));
@@ -60,7 +59,7 @@ MarkdownBlockToken MarkdownParser::parseBlockLine(const QString &line) const
     return {MarkdownBlockToken::Type::Paragraph, 0, parseInline(line)};
 }
 
-QVector<InlineNodePtr> MarkdownParser::parseInline(const QString &text) const
+QVector<InlineNodePtr> MarkdownParser::parseInline(const QString &text)
 {
     return MarkdownInlineParser(text).astRoot()->children;
 }
@@ -92,6 +91,7 @@ MarkdownRenderer::MarkdownRenderer(QTextCursor *cursor)
       m_atBeginning(true),
       m_currentList(nullptr)
 {
+    Q_ASSERT(m_cursor);
 }
 
 void MarkdownRenderer::renderBlocks(const QVector<MarkdownBlockToken> &tokens)
@@ -199,7 +199,7 @@ void MarkdownRenderer::applyNodeStyle(InlineNodePtr node, QTextCharFormat &fmt) 
 };
 
 
-QTextDocument *MarkdownImporter::createDocument(const QString &markdown, QObject *parent)
+QTextDocument *documentFromMarkdown(const QString &markdown, QObject *parent)
 {
     QVector<MarkdownBlockToken> tokens = MarkdownParser::parse(markdown);
     return MarkdownRenderer::createDocument(tokens, parent);

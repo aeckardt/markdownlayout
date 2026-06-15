@@ -21,12 +21,14 @@ SOURCES += \
     src/tests.cpp
 
 HEADERS += \
+    src/texteditor/htmlimporter_p.h \
     src/texteditor/inlineformatresolver.h \
     src/texteditor/htmlexporter.h \
     src/texteditor/htmlimporter.h \
     src/texteditor/htmlstyle.h \
     src/texteditor/markdownexporter.h \
     src/texteditor/markdownimporter.h \
+    src/texteditor/markdownimporter_p.h \
     src/texteditor/markdowninlineparser.h \
     src/texteditor/texteditorstyle.h \
     src/texteditor/texteditorstyle_config.h
