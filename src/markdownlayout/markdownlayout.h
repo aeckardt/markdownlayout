@@ -8,21 +8,16 @@ class LayoutMetrics
 {
 public:
     float fallbackWidth = 760.0;
-    float leftMargin = 28.0;
-    float rightMargin = 28.0;
-    float topMargin = 24.0;
-    float bottomMargin = 24.0;
-    float paragraphSpacing = 8.0;
+    float leftMargin = 0.0;
+    float rightMargin = 0.0;
+    float topMargin = 0.0;
+    float bottomMargin = 0.0;
+    float paragraphSpacing = 4.0;
     float listMarkerWidth = 24.0;
     float blockPaddingX = 12.0;
     float blockPaddingY = 8.0;
     float quoteBarWidth = 4.0;
 };
-
-const int BLOCK_TYPE_PROPERTY = QTextFormat::Property::UserProperty + 1;
-const int BLOCK_TYPE_NORMAL = 0;
-const int BLOCK_TYPE_QUOTE  = 1;
-const int BLOCK_TYPE_CODE   = 2;
 
 class MarkdownLayout : public QAbstractTextDocumentLayout
 {
@@ -60,7 +55,5 @@ private:
     QList<QTextLayout::FormatRange> selectionsForBlock(const PaintContext &context, QTextBlock block) const;
     int hitTestBlock(QTextBlock block, QPointF point, Qt::HitTestAccuracy accuracy) const;
 };
-
-int blockType(QTextBlock block);
 
 #endif // MARKDOWNLAYOUT_H

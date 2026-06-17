@@ -8,7 +8,7 @@
 #include <QVector>
 
 struct InlineFormat {
-    enum class Type {
+    enum Type {
         Bold = 0,
         Italic,
         Underline,

@@ -3,7 +3,8 @@
 
 #include <QHash>
 #include <QString>
-#include <QTextCharFormat>
+
+class QTextCharFormat;
 
 typedef QHash<QString, QString> CssProperties;
 typedef QHash<QString, CssProperties> CssRules;

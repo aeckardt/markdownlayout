@@ -10,6 +10,8 @@
 #include <QTextList>
 
 using namespace TextEditorStyle;
+using TokenType = HtmlToken::Type;
+using NodeType = HtmlNode::Type;
 
 static void appendCodePoint(QString &out, uint codePoint)
 {
@@ -142,7 +144,7 @@ HtmlNodePtr HtmlParser::findNode(const HtmlNodePtr &root, const QString &tagName
     return {};
 }
 
-HtmlNodePtr HtmlParser::findNode(const QList<HtmlNodePtr> &nodes, const QString &tagName)
+HtmlNodePtr HtmlParser::findNode(const QVector<HtmlNodePtr> &nodes, const QString &tagName)
 {
     for (const HtmlNodePtr &node : nodes) {
         HtmlNodePtr result = findNode(node, tagName);

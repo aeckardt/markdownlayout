@@ -80,7 +80,9 @@ void InlineFormatResolver::resolveChangeStack()
                     // Update start index of last opened format
                     // Thus, it will be re-opened in the next iteration
                     lastOpenFmt.start = index + 1;
-                // TODO: Review this code here
+                // TODO: (ChatGPT hint) Review the following code line
+                // Verify it can be assumed that openStack is not empty
+                // or do an assert
                 lastOpenFmt = openStack.takeLast();
             }
             fragment.formatChanges.append({closeFmt.type, closeFmt.attrs, false});

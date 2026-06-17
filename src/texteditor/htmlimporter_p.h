@@ -2,7 +2,7 @@
 #define HTMLIMPORTER_P_H
 
 #include <QHash>
-#include <QList>
+#include <QVector>
 #include <QString>
 #include <QStringView>
 #include <QTextBlockFormat>
@@ -40,12 +40,12 @@ struct HtmlNode {
         Text
     };
 
-    HtmlNode(const QString &name, const CssProperties &attrs, const QList<HtmlNodePtr> &children = {})
+    HtmlNode(const QString &name, const CssProperties &attrs, const QVector<HtmlNodePtr> &children = {})
         : type(Type::Element), name(name), attrs(attrs), children(children) {}
     HtmlNode(const QString &content) : type(Type::Text), content(content) {}
 
     static HtmlNodePtr makeElement(const QString &name, const CssProperties &attrs,
-        const QList<HtmlNodePtr> &children = {})
+        const QVector<HtmlNodePtr> &children = {})
     { return std::make_shared<HtmlNode>(name, attrs, children); }
 
     static HtmlNodePtr makeText(const QString &content)
@@ -54,7 +54,7 @@ struct HtmlNode {
     Type type;
     QString name;  // tag name if element
     CssProperties attrs;
-    QList<HtmlNodePtr> children;
+    QVector<HtmlNodePtr> children;
     QString content;  // only for text nodes
 };
 
@@ -63,26 +63,24 @@ class HtmlParser
 public:
     // Parse the HTML string to generate an array of roots
     // May be one root if everything is encapsulated in <html> tag
-    static QList<HtmlNodePtr> parse(const QString &html);
+    static QVector<HtmlNodePtr> parse(const QString &html);
 
     // Recursively searches the AST for the first node with the given tag name.
     static HtmlNodePtr findNode(const HtmlNodePtr &root, const QString &tagName);
 
     // Search in a list rather than a single root element
-    static HtmlNodePtr findNode(const QList<HtmlNodePtr> &nodes, const QString &tagName);
+    static HtmlNodePtr findNode(const QVector<HtmlNodePtr> &nodes, const QString &tagName);
 
 private:
     explicit HtmlParser(const QString &html) : m_input(html) {}
 
     // Tokenizer
-    QList<HtmlToken> tokenize() const;
+    QVector<HtmlToken> tokenize() const;
 
     // Parser
-    QList<HtmlNodePtr> parseChildNodes(const QList<HtmlToken> &tokens, int &pos, const QString &stopTag = {}) const;
+    QVector<HtmlNodePtr> parseChildNodes(const QVector<HtmlToken> &tokens, int &pos, const QString &stopTag = {}) const;
 
     const QStringView m_input;
-
-    using TokenType = HtmlToken::Type;
 };
 
 class HtmlRenderContext
@@ -135,8 +133,6 @@ private:
     int m_indent;
     int m_nestedUlTags;
     QTextList *m_currentList;
-
-    using NodeType = HtmlNode::Type;
 };
 
 #endif // HTMLIMPORTER_P_H

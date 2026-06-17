@@ -56,11 +56,12 @@ QString MarkdownExporter::exportBlock(const QTextBlock &block)
         return QStringLiteral("---");
 
     QString prefix;
-    if (textList) {
+    if (textList)
         prefix = QString(blockFormat.indent() * 2, QLatin1Char(' ')) + QStringLiteral("* ");
-    } else if (headingLevel >= 1 && headingLevel <= 4) {
+    else if (headingLevel >= 1 && headingLevel <= 4)
         prefix = QString(headingLevel, QLatin1Char('#')) + QLatin1Char(' ');
-    }
+    else if (blockFormat.hasProperty(QTextFormat::BlockQuoteLevel))
+        prefix = QStringLiteral("> ");
 
     const auto fragments = InlineFormatResolver(block, m_start, m_end).fragments();
     QString lineText;
@@ -111,16 +112,16 @@ QPair<QString, int> MarkdownExporter::exportFragment(const ExportableFragment &e
     QStringList closing;
     for (const auto &change : ef.formatChanges) {
         switch (change.type) {
-        case InlineFormat::Type::Bold:
+        case InlineFormat::Bold:
             (change.open ? opening : closing) << QStringLiteral("**");
             break;
-        case InlineFormat::Type::Italic:
+        case InlineFormat::Italic:
             (change.open ? opening : closing) << QStringLiteral("*");
             break;
-        case InlineFormat::Type::Underline:
+        case InlineFormat::Underline:
             (change.open ? opening : closing) << (change.open ? QStringLiteral("<ins>") : QStringLiteral("</ins>"));
             break;
-        case InlineFormat::Type::PointSize:
+        case InlineFormat::PointSize:
             if (headingLevel > 0)
                 break;
             if (change.open)
@@ -128,7 +129,7 @@ QPair<QString, int> MarkdownExporter::exportFragment(const ExportableFragment &e
             else
                 closing << QStringLiteral("</span>");
             break;
-        case InlineFormat::Type::Link:
+        case InlineFormat::Link:
             if (change.open) {
                 opening << QStringLiteral("[");
             } else {
@@ -139,5 +140,5 @@ QPair<QString, int> MarkdownExporter::exportFragment(const ExportableFragment &e
         }
     }
 
-    return { leading + opening.join(QString()) + core + closing.join(QString()) + trailing, remaining };
+    return {leading + opening.join(QString()) + core + closing.join(QString()) + trailing, remaining};
 }

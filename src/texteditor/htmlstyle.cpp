@@ -1,11 +1,11 @@
 #include "texteditor/htmlstyle.h"
 
-#include <QDebug>
 #include <QFont>
 #include <QHash>
+#include <QRegularExpression>
 #include <QString>
 #include <QStringList>
-#include <QRegularExpression>
+#include <QTextCharFormat>
 
 bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFormat)
 {

@@ -92,7 +92,7 @@ QString ScopeMarker::content() const
     }
 }
 
-void ScopeMarker::resetContent(const QString &content)
+void ScopeMarker::setContent(const QString &content)
 {
     switch (m_type) {
     case Type::HtmlTag:
@@ -390,7 +390,7 @@ void MarkdownInlineParser::consumeMatch(ScopeMarkerPtr leftMarker, ScopeMarkerPt
         leftMarker->node()->children = {rightMarker->node()};
 
         // Reduce open number of asterisks on left side
-        leftMarker->resetContent(QString(leftLength - rightLength, QLatin1Char('*')));
+        leftMarker->setContent(QString(leftLength - rightLength, QLatin1Char('*')));
 
         // Put the left marker back on the stack
         pushScopeMarker(leftMarker);
@@ -400,7 +400,7 @@ void MarkdownInlineParser::consumeMatch(ScopeMarkerPtr leftMarker, ScopeMarkerPt
         integrateNode(leftMarker->node());
 
         // Update marker to match left_length chars
-        rightMarker->resetContent(QString(rightLength - leftLength, QLatin1Char('*')));
+        rightMarker->setContent(QString(rightLength - leftLength, QLatin1Char('*')));
 
         // Try to match asterisks to the left with the altered stack
         ScopeMarkerPtr openMarker = findOpeningMarker(rightMarker);

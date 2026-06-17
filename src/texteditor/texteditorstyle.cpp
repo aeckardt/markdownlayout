@@ -1,5 +1,5 @@
 #include "texteditorstyle.h"
-#include "texteditorstyle_config.h"
+#include "texteditorstyle_p.h"
 
 #include <QGuiApplication>
 #include <QTextBlock>
