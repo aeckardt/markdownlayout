@@ -41,8 +41,6 @@ inline constexpr QFont::Weight StrongFontWeight  = QFont::Bold;
 
 // Static const variables available with initialization
 const QColor &linkColor();
-const QString &listPadding();
-const int &listPaddingLength();
 
 // Default block format for TextEditor
 const QTextBlockFormat &defaultBlockFormat();

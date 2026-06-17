@@ -94,10 +94,8 @@ private:
     void removeBlockStyleFromBlock(const QTextBlock &block);
 
     void toggleList();
+    void toggleBlockQuote();
     void makeHorizontalRuler();
-
-    void insertListPadding(const QTextBlock &block) const;
-    void removeListPadding(const QTextBlock &block) const;
 
     void setListStyle(QTextCursor &cursor, QTextListFormat::Style style);
 
@@ -107,7 +105,6 @@ private:
 
     // Event handlers
     void keyPressEvent(QKeyEvent *event) override;
-    bool moveCursor(QTextCursor::MoveOperation op);
     void updateCursorX(const QTextCursor &cursor);
     void keyReleaseEvent(QKeyEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;

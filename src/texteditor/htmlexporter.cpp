@@ -80,11 +80,6 @@ QString HtmlExporter::exportBlock(const QTextBlock &block)
 
         QString text = fragment.text();
 
-        // Remove two leading spaces from text, if it's a list point
-        // They are automatically added for the sake of aesthetics
-        if (atBlockBegin && block.textList() && text.startsWith(TextEditorStyle::listPadding()))
-            text = text.mid(TextEditorStyle::listPaddingLength());
-
         // Calculate selection boundaries within this fragment
         const int sliceLeft = std::max(0, m_start - fragment.position());
         const int remaining = m_end - fragment.position() - fragment.length();

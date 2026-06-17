@@ -541,9 +541,8 @@ void TextEditor::setHeadingLevel(int level)
     if (textList) {
         // Remove list
         blockFmt.setObjectIndex(-1);
-
-        // Remove list padding whitespaces
-        removeListPadding(cursor.block());
+        blockFmt.setIndent(0);
+        blockFmt.clearProperty(QTextFormat::ListStyle);
     }
 
     // Set heading level for block
@@ -582,7 +581,6 @@ void TextEditor::removeBlockStyleFromBlock(const QTextBlock &block)
         blockFmt.setObjectIndex(-1);
         blockFmt.setIndent(0);
         blockFmt.clearProperty(QTextFormat::ListStyle);
-        removeListPadding(block);
     } else if (blockFmt.headingLevel() > 0) {
         blockFmt.setHeadingLevel(0);
         clearHeadingCharFormat(block);
@@ -621,18 +619,54 @@ void TextEditor::toggleList()
         textList = cursor.createList(listFmt);
 
         blockFmt.setObjectIndex(textList->objectIndex());
-
-        // Indent two extra spaces to make it look more balanced
-        insertListPadding(block);
     } else {
         // Remove list at current block
         textList->remove(block);
 
         blockFmt.setObjectIndex(-1);
-
-        // Remove the two extra indent spaces
-        removeListPadding(block);
+        blockFmt.setIndent(0);
+        // TODO: Check if QTextBlockFormat actually has QTextFormat::ListStyle as a property
+        blockFmt.clearProperty(QTextFormat::ListStyle);
     }
+
+    cursor.setBlockFormat(blockFmt);
+    cursor.endEditBlock();
+
+    emit blockFormatChanged();
+}
+
+void TextEditor::toggleBlockQuote()
+{
+    QTextCursor cursor = textCursor();
+    const QTextBlock block = cursor.block();
+    QTextBlockFormat blockFmt = block.blockFormat();
+
+    cursor.beginEditBlock();
+
+    if (blockFmt.headingLevel() > 0) {
+        // Remove heading format
+        blockFmt.setHeadingLevel(0);
+
+        // Remove char format used for headings
+        clearHeadingCharFormat(block);
+    }
+
+    QTextList *textList = cursor.currentList();
+    if (textList) {
+        // Remove list at current block
+        textList->remove(block);
+
+        blockFmt.setObjectIndex(-1);
+        blockFmt.setIndent(0);
+        // TODO: Check if QTextBlockFormat actually has QTextFormat::ListStyle as a property
+        blockFmt.clearProperty(QTextFormat::ListStyle);
+    }
+
+    // Set / clear blockquote property
+    if (blockFmt.hasProperty(QTextFormat::BlockQuoteLevel))
+        blockFmt.clearProperty(QTextFormat::BlockQuoteLevel);
+    else
+        blockFmt.setProperty(QTextFormat::BlockQuoteLevel, 1);
 
     cursor.setBlockFormat(blockFmt);
     cursor.endEditBlock();
@@ -676,31 +710,6 @@ void TextEditor::makeHorizontalRuler()
     cursor.insertBlock(defaultBlockFormat(), defaultCharFormat());
 
     cursor.endEditBlock();
-}
-
-void TextEditor::insertListPadding(const QTextBlock &block) const
-{
-    if (block.text().startsWith(listPadding()))
-        return;
-
-    // Insert two spaces to list item before text
-    QTextCursor localCursor(block);
-    localCursor.setPosition(block.position());
-    localCursor.insertText(listPadding());
-}
-
-void TextEditor::removeListPadding(const QTextBlock &block) const
-{
-    // Check if block starts with padding
-    if (!block.text().startsWith(listPadding()))
-        return;
-
-    // Remove padding
-    QTextCursor localCursor(block);
-    localCursor.setPosition(block.position());
-    localCursor.setPosition(block.position() + listPaddingLength(),
-                            QTextCursor::MoveMode::KeepAnchor);
-    localCursor.removeSelectedText();
 }
 
 void TextEditor::setListStyle(QTextCursor &cursor, QTextListFormat::Style style)
@@ -797,16 +806,19 @@ void TextEditor::keyPressEvent(QKeyEvent *event)
             copy();
             return;
         }
+        break;
     case Qt::Key_V:
         if (event->modifiers() == Qt::ControlModifier) {
             paste();
             return;
         }
+        break;
     case Qt::Key_X:
         if (event->modifiers() == Qt::ControlModifier) {
             cut();
             return;
         }
+        break;
     case Qt::Key_Return:
     case Qt::Key_Enter:
         insertBlock();
@@ -832,20 +844,35 @@ void TextEditor::keyPressEvent(QKeyEvent *event)
 
                 return;
             }
+            else if (it.fragment().text().startsWith(QStringLiteral(">"))) {
+                // Create a blockquote if a line starts with "> "
+                QTextCursor localCursor(cursor);
+                localCursor.beginEditBlock();
+                localCursor.setPosition(block.position());
+                localCursor.setPosition(block.position() + 1, QTextCursor::MoveMode::KeepAnchor);
+                localCursor.removeSelectedText();
+
+                // Second: create a list
+                toggleBlockQuote();
+                localCursor.endEditBlock();
+
+                return;
+            }
         }
     }
     case Qt::Key_Backspace: {
         QTextCursor cursor = textCursor();
-        QTextList *textList = cursor.currentList();
-        if (textList) {
-            const QTextBlock block = cursor.block();
-            if (cursor.position() - block.position() == listPaddingLength()) {
-                auto it = block.begin();
-                if (it.fragment().text().startsWith(listPadding())) {
-                    // Remove the list bullet from the current block
-                    toggleList();
-                    return;
-                }
+        const QTextBlock block = cursor.block();
+        QTextBlockFormat blockFmt = block.blockFormat();
+        if (cursor.position() == block.position()) {
+            QTextList *textList = cursor.currentList();
+            if (textList) {
+                // Remove the list bullet from the current block
+                toggleList();
+                return;
+            } else if (blockFmt.hasProperty(QTextFormat::BlockQuoteLevel)) {
+                toggleBlockQuote();
+                return;
             }
         }
     }
@@ -862,31 +889,6 @@ void TextEditor::keyPressEvent(QKeyEvent *event)
             }
         }
     }
-    case Qt::Key_Left:
-    case Qt::Key_Right:
-    case Qt::Key_Up:
-    case Qt::Key_Down: {
-        static const QVector<Qt::KeyboardModifier> modifiers = {
-            Qt::ShiftModifier, Qt::ControlModifier, Qt::AltModifier, Qt::MetaModifier
-        };
-        bool hasAnyOfModifiers = false;
-        for (auto modifier : modifiers) {
-            if (modifier & event->modifiers()) {
-                hasAnyOfModifiers = true;
-                break;
-            }
-        }
-        if (!hasAnyOfModifiers) {
-            static const QMap<Qt::Key, QTextCursor::MoveOperation> direction = {
-                {Qt::Key_Left, QTextCursor::Left},
-                {Qt::Key_Right, QTextCursor::Right},
-                {Qt::Key_Up, QTextCursor::Up},
-                {Qt::Key_Down, QTextCursor::Down}
-            };
-            if (moveCursor(direction.value(Qt::Key(event->key()))))
-                return;
-        }
-    }
     default:
         ;
     }
@@ -896,102 +898,7 @@ void TextEditor::keyPressEvent(QKeyEvent *event)
 
     updateOverrideCursor();
 
-    // Call native keypress handler
     QTextEdit::keyPressEvent(event);
-}
-
-/*
- * Navigates the cursor in the direction of the pressed key.
- * The purpose of this function is to customize the behavior when navigating over lists.
-
- * Returns true, if the move operation has been handled successfully.
- */
-bool TextEditor::moveCursor(QTextCursor::MoveOperation op)
-{
-    using MoveOp = QTextCursor::MoveOperation;
-    using MoveMode = QTextCursor::MoveMode;
-
-    QTextCursor cursor(textCursor());
-    int pos = cursor.position();
-    QTextBlock block = cursor.block();
-    QTextLayout *layout = block.layout();
-    QTextLine line = layout->lineForTextPosition(cursor.positionInBlock());
-    MoveMode mode = MoveMode::MoveAnchor;
-    int newPos = -1;
-
-    // Determine new cursor position
-    switch (op) {
-    case MoveOp::Left:
-    case MoveOp::Right: {
-        cursor.movePosition(op, mode);
-        block = cursor.block();
-        newPos = cursor.position();
-
-        break;
-    }
-    case MoveOp::Up:
-    case MoveOp::Down: {
-        int lineIndex;
-
-        if (m_cursorX == -1)
-            updateCursorX(cursor);
-        m_keepCursorX = true;
-        if (op == MoveOp::Up) {
-            lineIndex = line.lineNumber() - 1;
-            if (lineIndex == -1) {
-                block = block.previous();
-                layout = block.layout();
-                lineIndex = layout
-                        ? layout->lineCount() - 1
-                        : 0;
-            }
-        } else {
-            lineIndex = line.lineNumber() + 1;
-            if (lineIndex >= layout->lineCount()) {
-                block = block.next();
-                layout = block.layout();
-                lineIndex = 0;
-            }
-        }
-        if (!layout)
-            // If layout is nullptr it means that the cursor reached the top or the
-            // bottom of the document. No move operation necessary here!
-            return true;
-         if (layout->lineCount() != 0) {
-            line = layout->lineAt(lineIndex);
-            newPos = block.position() + line.xToCursor(m_cursorX);
-        } else
-            newPos = block.position();
-        break;
-    }
-    default:
-        return false;
-    }
-
-    // Skip over padding after list bullet
-    QTextList *textList = block.textList();
-    if (textList) {
-        if (newPos - block.position() < listPaddingLength()) {
-            auto it = block.begin();
-            if (it.fragment().text().startsWith(listPadding())) {
-                if (op == MoveOp::Left && block.position() > 0)
-                    newPos = block.position() - 1;
-                else
-                    newPos = block.position() + listPaddingLength();
-            }
-        }
-    }
-
-    if (pos == newPos)
-        // The position hasn't changed
-        return false;
-
-    // Set cursor position
-    cursor.setPosition(newPos);
-    setTextCursor(cursor);
-    ensureCursorVisible();
-
-    return true;
 }
 
 void TextEditor::updateCursorX(const QTextCursor &cursor)
@@ -1134,24 +1041,22 @@ void TextEditor::insertBlock()
 
     cursor.beginEditBlock();
     if (posInBlock == 0) {
-        if (blockFmt.headingLevel() > 0)
-            cursor.setCharFormat(defaultCharFormat());
+        cursor.setCharFormat(defaultCharFormat());
 
         // The cursor is at the beginning of the line
         // Thus all the content is going to move to the newly inserted line
         // -> Move the block and char formatting as well
         cursor.insertBlock();
 
-        // If previous block has been a heading
+        // If previous block has been a heading or a blockquote
         // Set default format there
-        if (blockFmt.headingLevel() > 0) {
+        if (blockFmt.headingLevel() > 0 || blockFmt.hasProperty(QTextFormat::BlockQuoteLevel)) {
             cursor.setPosition(cursor.position() - 1);
             cursor.setBlockFormat(defaultBlockFormat());
         }
-    } else if (blockFmt.objectIndex() != -1) {
+    } else if (blockFmt.objectIndex() != -1)
         cursor.insertBlock(blockFmt);
-        cursor.insertText(listPadding());
-    } else
+    else
         cursor.insertBlock(defaultBlockFormat(), defaultCharFormat());
     cursor.endEditBlock();
 

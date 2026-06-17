@@ -101,12 +101,8 @@ QRectF MarkdownLayout::frameBoundingRect(QTextFrame *frame) const
     return QRectF(QPointF(0.0, 0.0), m_documentSize);
 }
 
-void MarkdownLayout::documentChanged(int from, int charsRemoved, int charsAdded)
+void MarkdownLayout::documentChanged(int, int, int)
 {
-    Q_UNUSED(from)
-    Q_UNUSED(charsRemoved)
-    Q_UNUSED(charsAdded)
-
     QSizeF oldSize(m_documentSize);
     m_dirty = true;
     ensureLayout();
@@ -126,7 +122,7 @@ void MarkdownLayout::ensureLayout()
 
     QTextDocument *doc = document();
     float docWidth = documentWidth();
-    float y = m_metrics.topMargin;
+    float y = 0.0;
 
     QTextOption option(doc->defaultTextOption());
     option.setWrapMode(QTextOption::WrapMode::WordWrap);
@@ -138,8 +134,8 @@ void MarkdownLayout::ensureLayout()
         bool isBlockQuote = blockFmt.hasProperty(QTextFormat::BlockQuoteLevel);
         bool isCodeBlock = blockFmt.hasProperty(QTextFormat::BlockCodeFence);
 
-        float textX = m_metrics.leftMargin;
-        float availableWidth = docWidth - m_metrics.leftMargin - m_metrics.rightMargin;
+        float textX = 0.0;
+        float availableWidth = docWidth;
 
         if (isListItem) {
             textX += m_metrics.listMarkerWidth;
@@ -157,9 +153,9 @@ void MarkdownLayout::ensureLayout()
         layout->clearLayout();
         layout->setFont(doc->defaultFont());
         layout->setTextOption(option);
-        layout->setPosition(QPointF(textX, y + topPaddingForBlock(block)));
+        layout->setPosition(QPointF(0.0, y + topPaddingForBlock(block)));
 
-        float textHeight = layoutBlockText(layout, availableWidth);
+        float textHeight = layoutBlockText(layout, textX, availableWidth);
         if (textHeight <= 0.0)
             textHeight = QFontMetrics(doc->defaultFont()).height();
 
@@ -175,20 +171,22 @@ void MarkdownLayout::ensureLayout()
         block = block.next();
     }
 
-    float totalHeight = std::max(y + m_metrics.bottomMargin, m_metrics.topMargin + m_metrics.bottomMargin);
+    float totalHeight = std::max<float>(y, 0.0);
     m_documentSize = QSizeF(docWidth, totalHeight);
 }
 
-qreal MarkdownLayout::layoutBlockText(QTextLayout *layout, qreal lineWidth) const
+qreal MarkdownLayout::layoutBlockText(QTextLayout *layout, qreal lineX, qreal lineWidth) const
 {
     layout->beginLayout();
-    float y = 0.0;
+    qreal y = 0.0;
     while (true) {
         QTextLine line = layout->createLine();
         if (!line.isValid())
             break;
+
         line.setLineWidth(lineWidth);
-        line.setPosition(QPointF(0.0, y));
+        line.setPosition(QPointF(lineX, y));
+
         y += line.height();
     }
     layout->endLayout();
@@ -235,9 +233,7 @@ void MarkdownLayout::drawBlockDecoration(QPainter *painter, QTextBlock block, QR
     if (isListItem)
         drawMarkdownListMarker(painter, block);
     else if (isBlockQuote) {
-        QRectF bg = rect.adjusted(0.0, 0.0, 0.0, 0.0);
-        painter->fillRect(bg, QColor("#f6f8fa"));
-
+        painter->fillRect(rect, QColor("#f6f8fa"));
         QRectF bar = QRectF(
                     0.0,
                     rect.top() + 4.0,
@@ -245,10 +241,8 @@ void MarkdownLayout::drawBlockDecoration(QPainter *painter, QTextBlock block, QR
                     std::max(0.0, rect.height() - 8.0)
                 );
         painter->fillRect(bar, QColor("#d0d7de"));
-    } else if (isCodeBlock) {
-        QRectF bg = rect.adjusted(m_metrics.leftMargin / 2, 0.0, -m_metrics.rightMargin / 2, 0.0);
-        painter->fillRect(bg, QColor("#f6f8fa"));
-    }
+    } else if (isCodeBlock)
+        painter->fillRect(rect, QColor("#f6f8fa"));
 }
 
 void MarkdownLayout::drawMarkdownListMarker(QPainter *painter, QTextBlock block)
@@ -259,7 +253,7 @@ void MarkdownLayout::drawMarkdownListMarker(QPainter *painter, QTextBlock block)
 
     QTextLine firstLine = layout->lineAt(0);
     qreal baselineY = layout->position().y() + firstLine.y() + firstLine.ascent();
-    qreal markerX = layout->position().x() - m_metrics.listMarkerWidth + 6.0;
+    qreal markerX = layout->position().x() + firstLine.x() - m_metrics.listMarkerWidth + 6.0;
 
     painter->save();
     painter->setPen(QPen(QColor("#57606a")));

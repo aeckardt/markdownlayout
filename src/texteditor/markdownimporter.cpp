@@ -117,8 +117,6 @@ void MarkdownRenderer::renderBlocks(const QVector<MarkdownBlockToken> &tokens)
             m_charFmt.setProperty(QTextFormat::FontSizeAdjustment, 4 - token.level);
             break;
         case TokenType::ListItem:
-            m_cursor->insertText(listPadding(), defaultCharFormat());
-
             if (!m_currentList) {
                 if (m_cursor->currentList())
                     m_currentList = m_cursor->currentList();

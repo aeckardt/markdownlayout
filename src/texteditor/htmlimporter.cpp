@@ -509,12 +509,6 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
         // Use new line for list item
         insertBlock();
 
-        // If a new line has not been added, the cursor might not be at the block start
-        if (m_cursor->atBlockStart())
-            // Insert two spaces, because the bullet is usually pretty tightly squeezed onto the text
-            // And there is unfortunately no simple styling that can change that
-            m_cursor->insertText(listPadding(), QTextCharFormat());
-
         if (!m_currentList) {
             if (m_cursor->currentList())
                 m_currentList = m_cursor->currentList();
@@ -552,9 +546,6 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
 
     // Handle styles
     const CssProperties style = m_context.getStyleFor(node);
-
-    // Apply styles to m_blockFmt
-    applyBlockFormatStyle(style);
 
     // Apply styles to m_charFmt
     fmtChanged = fmtChanged || applyHtmlStyle(style, m_charFmt);
@@ -629,86 +620,6 @@ void HtmlRenderer::finalizeBlock()
     int listIndent = std::max<int>(0, m_nestedUlTags - 1);
     m_blockFmt.setIndent(m_indent + listIndent);
     m_cursor->setBlockFormat(m_blockFmt);
-}
-
-void HtmlRenderer::applyBlockFormatStyle(const CssProperties &style)
-{
-    // Define aliases
-    using LineHeightType = QTextBlockFormat::LineHeightTypes;
-    static constexpr auto ProportionalHeight = LineHeightType::ProportionalHeight;
-    static constexpr auto FixedHeight = LineHeightType::FixedHeight;
-
-    // Left margin for blocks
-    if (style.contains(QStringLiteral("left-margin"))) {
-        // Parse a left-margin string (e.g., "10px", "-1.5em", "10") and return a pixel value.
-        // If the unit is "em", multiply the numeric value by defaultFontSize.
-        // If there's no unit or the unit is "px", set the value as a float.
-        // ...
-        const QString leftMarginStr = style.value(QStringLiteral("left-margin"));
-
-        static const QRegularExpression leftMarginPattern(R"(^(-?[\d.]+)\s*(px|em)?)");
-        const QRegularExpressionMatch match = leftMarginPattern.match(leftMarginStr);
-        if (match.hasMatch()) {
-            bool ok = false;
-            const qreal value = match.captured(1).toDouble(&ok);
-            if (ok) {
-                const QString unit = match.captured(2);
-                if (unit == QStringLiteral("em"))
-                    m_blockFmt.setProperty(QTextFormat::BlockLeftMargin, value * (qreal)defaultFontPointSize());
-                else
-                    // Treat no unit or "px" as pixels.
-                    m_blockFmt.setProperty(QTextFormat::BlockLeftMargin, value);
-            } else
-                qWarning("Unable to parse left-margin property");
-        } else
-            qWarning("Unable to parse left-margin property");
-    }
-
-    // Qt block indent
-    if (style.contains(QStringLiteral("-qt-block-indent"))) {
-        const QString indentStr = style.value(QStringLiteral("-qt-block-indent")).trimmed();
-
-        static const QRegularExpression indentPattern(R"(^(\d+))");
-        const QRegularExpressionMatch match = indentPattern.match(indentStr);
-        if (match.hasMatch()) {
-            bool ok = false;
-            const int indent = match.captured(1).toInt(&ok);
-            if (ok)
-                m_indent = indent;
-            else
-                qWarning("Unable to parse -qt-block-indent property");
-        } else
-            qWarning("Unable to parse -qt-block-indent property");
-    }
-
-    // Line height
-    if (style.contains(QStringLiteral("line-height"))) {
-        const QString lineHeightStr = style.value(QStringLiteral("line-height")).trimmed();
-
-        static const QRegularExpression lineHeightPattern(R"(^([\d.]+)\s*(%)?)");
-        const QRegularExpressionMatch match = lineHeightPattern.match(lineHeightStr);
-        if (match.hasMatch()) {
-            bool ok = false;
-            const qreal value = match.captured(1).toDouble(&ok);
-            if (ok) {
-                if (match.captured(2) == QStringLiteral("%")) {
-                    m_blockFmt.setProperty(QTextFormat::LineHeightType, ProportionalHeight);
-                    m_blockFmt.setProperty(QTextFormat::LineHeight, value);
-                } else {
-                    m_blockFmt.setProperty(QTextFormat::LineHeightType, FixedHeight);
-                    m_blockFmt.setProperty(QTextFormat::LineHeight, value);
-                }
-            } else
-                qWarning("Unable to parse line-height property");
-        } else if (lineHeightStr == QStringLiteral("normal")) {
-            m_blockFmt.setProperty(QTextFormat::LineHeightType, defaultBlockFormat().lineHeightType());
-            m_blockFmt.setProperty(QTextFormat::LineHeight, defaultBlockFormat().lineHeight());
-        } else if (lineHeightStr == QStringLiteral("unset")) {
-            m_blockFmt.clearProperty(QTextFormat::LineHeightType);
-            m_blockFmt.clearProperty(QTextFormat::LineHeight);
-        } else
-            qWarning("Unable to parse line-height property");
-    }
 }
 
 QTextDocument *documentFromHtml(const QString &html, QObject *parent)

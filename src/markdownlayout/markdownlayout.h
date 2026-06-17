@@ -7,22 +7,17 @@
 class LayoutMetrics
 {
 public:
-    float fallbackWidth = 760.0;
-    float leftMargin = 0.0;
-    float rightMargin = 0.0;
-    float topMargin = 0.0;
-    float bottomMargin = 0.0;
+    qreal fallbackWidth = 760.0;
     float paragraphSpacing = 4.0;
-    float listMarkerWidth = 24.0;
-    float blockPaddingX = 12.0;
-    float blockPaddingY = 8.0;
-    float quoteBarWidth = 4.0;
+    qreal listMarkerWidth = 24.0;
+    qreal blockPaddingX = 12.0;
+    qreal blockPaddingY = 8.0;
+    qreal quoteBarWidth = 4.0;
 };
 
 class MarkdownLayout : public QAbstractTextDocumentLayout
 {
     Q_OBJECT
-
 public:
     MarkdownLayout(QTextDocument *doc);
 
@@ -34,7 +29,7 @@ public:
     QRectF frameBoundingRect(QTextFrame *frame) const override;
 
 protected:
-    void documentChanged(int from, int charsRemoved, int charsAdded) override;
+    void documentChanged(int, int, int) override;
 
 private:
     LayoutMetrics m_metrics;
@@ -43,7 +38,7 @@ private:
     QMap<int, QRectF> m_blockRects;
 
     void ensureLayout();
-    qreal layoutBlockText(QTextLayout *layout, qreal lineWidth) const;
+    qreal layoutBlockText(QTextLayout *layout, qreal lineX, qreal lineWidth) const;
     qreal documentWidth() const;
     qreal topPaddingForBlock(QTextBlock block) const;
     qreal bottomPaddingForBlock(QTextBlock block) const;

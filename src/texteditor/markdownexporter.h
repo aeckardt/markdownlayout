@@ -5,6 +5,8 @@
 #include <QTextDocument>
 #include <QString>
 
+struct ExportableFragment;
+
 class MarkdownExporter {
 public:
     static QString exportDocument(QTextDocument *document, const QTextCursor *range = nullptr);
@@ -14,8 +16,7 @@ private:
 
     QString exportAll();
     QString exportBlock(const QTextBlock &block);
-    QPair<QString, int> exportFragment(const struct ExportableFragment &fragment,
-                                       bool removeTwoSpaces,
+    QPair<QString, int> exportFragment(const ExportableFragment &fragment,
                                        int headingLevel = 0);
 
     QTextDocument *m_document = nullptr;

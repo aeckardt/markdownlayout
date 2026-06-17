@@ -14,18 +14,6 @@ const QColor &linkColor()
     return color;
 }
 
-const QString &listPadding()
-{
-    static QString padding(QStringLiteral(LIST_PADDING));
-    return padding;
-}
-
-const int &listPaddingLength()
-{
-    static const int length = listPadding().length();
-    return length;
-}
-
 /*
  * Sets up properties for a QTextBlockFormat that is used each time
  * a new block is added to a QTextDocument in TextEditor.

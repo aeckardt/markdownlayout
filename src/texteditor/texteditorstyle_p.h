@@ -5,7 +5,6 @@
 
 // TextEditor styles (do not remove)
 #define LINK_COLOR   "#1c37e5"
-#define LIST_PADDING "  "
 
 // Optional TextEditor styles (remove to deactivate)
 #define DOCUMENT_INDENT_WIDTH  30

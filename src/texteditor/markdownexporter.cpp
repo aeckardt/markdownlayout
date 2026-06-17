@@ -65,31 +65,25 @@ QString MarkdownExporter::exportBlock(const QTextBlock &block)
 
     const auto fragments = InlineFormatResolver(block, m_start, m_end).fragments();
     QString lineText;
-    bool atBlockBegin = true;
 
     for (const auto &fragment : fragments) {
         if (!fragment.fragment.isValid())
             break;
 
-        const auto exported = exportFragment(fragment, atBlockBegin && textList, headingLevel);
+        const auto exported = exportFragment(fragment, headingLevel);
         lineText += exported.first;
         if (exported.second <= 0)
             break;
-        atBlockBegin = false;
     }
 
     return prefix + lineText;
 }
 
 QPair<QString, int> MarkdownExporter::exportFragment(const ExportableFragment &ef,
-                                                     bool removeTwoSpaces,
                                                      int headingLevel)
 {
     const auto fragment = ef.fragment;
     QString text = fragment.text();
-
-    if (removeTwoSpaces && text.startsWith(TextEditorStyle::listPadding()))
-        text = text.mid(TextEditorStyle::listPaddingLength());
 
     const int sliceLeft = std::max(0, m_start - fragment.position());
     const int remaining = m_end - fragment.position() - fragment.length();
