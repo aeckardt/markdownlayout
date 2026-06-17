@@ -1037,33 +1037,36 @@ void TextEditor::mouseReleaseEvent(QMouseEvent *event)
 {
     handleMouseEvent(event);
 
-    if (!m_anchor.isEmpty()) {
-        if (!m_ctrlPressed)
-            // If Ctrl is not pressed, do nothing!
-            return;
-        if (m_anchor.length() > 8 && m_anchor.left(8) == QStringLiteral("https://")) {
-            QUrl url(m_anchor);
-
-            m_ctrlPressed = false;
-            m_anchor.clear();
-            updateOverrideCursor();
-
-            // Open url in standard browser
-            QDesktopServices::openUrl(url);
-        } else if (m_anchor.length() > 7 && m_anchor.left(7) == QStringLiteral("file://")) {
-            const QString filename = m_anchor.mid(7);
-
-            m_ctrlPressed = false;
-            m_anchor.clear();
-            updateOverrideCursor();
-
-            // Open filename with standard application
-            systemOpenFile(filename, m_workingDirPath);
-        }
+    if (m_anchor.isEmpty()) {
+        // If no link is being clicked
+        // Use default event handler
+        QTextEdit::mouseReleaseEvent(event);
         return;
     }
 
-    QTextEdit::mouseReleaseEvent(event);
+    if (!m_ctrlPressed)
+        // If Ctrl is not pressed, do nothing!
+        return;
+
+    if (m_anchor.length() > 8 && m_anchor.left(8) == QStringLiteral("https://")) {
+        QUrl url(m_anchor);
+
+        m_ctrlPressed = false;
+        m_anchor.clear();
+        updateOverrideCursor();
+
+        // Open url in standard browser
+        QDesktopServices::openUrl(url);
+    } else if (m_anchor.length() > 7 && m_anchor.left(7) == QStringLiteral("file://")) {
+        const QString filename = m_anchor.mid(7);
+
+        m_ctrlPressed = false;
+        m_anchor.clear();
+        updateOverrideCursor();
+
+        // Open filename with standard application
+        systemOpenFile(filename, m_workingDirPath);
+    }
 }
 
 void TextEditor::handleMouseEvent(QMouseEvent *event)
@@ -1226,23 +1229,6 @@ void TextEditor::updatePasteAction()
 {
     m_pasteAction->setEnabled(canPaste());
 }
-
-//bool systemOpenFile(const QString &filename, const QString &dirPath)
-//{
-//    QString filePath = filename;
-
-//    if (!dirPath.isEmpty())
-//        filePath = QDir(dirPath).filePath(filename);
-
-//    const QString absolutePath = QFileInfo(filePath).absoluteFilePath();
-//    const QUrl url = QUrl::fromLocalFile(absolutePath);
-
-//    const bool ok = QDesktopServices::openUrl(url);
-//    if (!ok)
-//        qWarning().noquote() << QStringLiteral("Error opening file \"%1\".").arg(absolutePath);
-
-//    return ok;
-//}
 
 void systemOpenFile(const QString &filename, const QString &dirPath)
 {
