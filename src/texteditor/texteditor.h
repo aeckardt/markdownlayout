@@ -21,8 +21,28 @@ class TextEditor : public QTextEdit
 public:
     explicit TextEditor(QWidget *parent = nullptr);
 
+private:
+    // Initialization (called from constructor)
+    void setupActions();
+    void setupContextMenu();
+
+public:
     // Import document
     void setDocument(QTextDocument *document);
+
+    enum BlockType : int {
+        Paragraph       = 0,
+        Heading1        = 10,
+        Heading2        = 11,
+        Heading3        = 12,
+        Heading4        = 13,
+        TextList        = 20,
+        BlockQuote      = 30,
+        HorizontalRuler = 40
+    };
+
+    BlockType blockType(const QTextBlock &block) const;
+    static int headingLevel(BlockType type);
 
     // Copy content as markdown to clipboard
     void copyAsMarkdown();
@@ -31,13 +51,20 @@ public:
     void setWorkingDirectory(const QString &dirPath)
     { m_workingDirPath = dirPath; }
 
+public slots:
+    // Clipboard functions
+    void copy();
+    void paste();
+    void cut();
+
+    // Text insertion
+    void insertHyperlink();
+    void editHyperlink();
+    void insertEmoji();
+
 signals:
     void fontChanged(const QFont &font);
-    void blockFormatChanged();
-
-private:
-    void setupActions();
-    void setupContextMenu();
+    void blockFormatChanged(const QTextBlock &block);
 
 private slots:
     // QTextEdit slots
@@ -56,18 +83,19 @@ private slots:
 private:
     void clearStrongOnSelection();
 
-    void applyHeadingCharFormat(const QTextBlock &block, int headingLevel);
+    static QTextCharFormat headingCharFormat(int headingLevel, QTextCharFormat charFmt = QTextCharFormat());
+    void applyHeadingCharFormatToBlock(const QTextBlock &block, int headingLevel);
     void clearHeadingCharFormat(const QTextBlock &block)
-    { applyHeadingCharFormat(block, 0); }
+    { applyHeadingCharFormatToBlock(block, 0); }
 
     typedef std::function<QTextCharFormat(const QTextBlock &, QTextCharFormat)> FormatModifier;
     struct CharFormatUpdate {
         int start;
         int end;
-        QTextCharFormat charFmt;
+        QTextCharFormat newCharFmt;
     };
 
-    void applyFragmentChangesToSelection(QTextCursor &cursor, const FormatModifier &modifier);
+    void applyFragmentChangesToSelection(const FormatModifier &modifier);
     void applyFragmentChangesToBlock(const QTextBlock &block, const FormatModifier &modifier);
     void applyFragmentChangesToRange(const QVector<QTextBlock> &blocks,
                                      int startPos, int endPos,
@@ -75,37 +103,46 @@ private:
 
     void mergeFormatOnSelection(const QTextCharFormat &format, bool selectWord = false);
 
-private slots:
-    // Text insertion
-    void insertHyperlink();
-    void editHyperlink();
-    void insertEmoji();
-
-private:
     // BlockFormat manipulation
-    void indentSelection() { adjustListIndentation(1); }
-    void unindentSelection() { adjustListIndentation(-1); }
-    void adjustListIndentation(int delta);
-    void adjustListBlockIndentation(const QTextBlock &block, int delta);
+    enum ScopePolicy {
+        CurrentBlock,
+        SelectedBlocks
+    };
 
-    void setHeadingLevel(int level);
+    void setBlockType(BlockType type, ScopePolicy policy, bool toggle = false);
+    void setBlockTypeForBlock(const QTextBlock &block, BlockType type, bool toggle = false);
 
-    void removeBlockStyle();
-    void removeBlockStyleFromBlock(const QTextBlock &block);
+    void setHeadingLevel(int level)
+    { setBlockType(static_cast<BlockType>((int)Heading1 + (level - 1)), CurrentBlock); }
 
-    void toggleList();
-    void toggleBlockQuote();
-    void makeHorizontalRuler();
+    void toggleList()
+    { setBlockType(TextList, SelectedBlocks, true); }
+
+    void toggleBlockQuote()
+    { setBlockType(BlockQuote, SelectedBlocks, true); }
+
+    void makeHorizontalRuler()
+    { setBlockType(HorizontalRuler, CurrentBlock); }
+
+    void removeBlockStyle()
+    { setBlockType(Paragraph, SelectedBlocks); }
 
     void setListStyle(QTextCursor &cursor, QTextListFormat::Style style);
 
-    QVector<QTextBlock> selectedBlocks(const QTextCursor &cursor) const;
+    void indentSelection() { adjustListIndentation(1); }
+    void unindentSelection() { adjustListIndentation(-1); }
+    void adjustListIndentation(int delta);
+    void adjustListIndentationForBlock(const QTextBlock &block, int delta);
+
+    QVector<QTextBlock> selectedBlocks() const;
+
+    // Custom editor behavior
+    void insertBlock();
 
     static HyperlinkPtr getLinkUnderCursor(const QTextCursor &cursor);
 
     // Event handlers
     void keyPressEvent(QKeyEvent *event) override;
-    void updateCursorX(const QTextCursor &cursor);
     void keyReleaseEvent(QKeyEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
@@ -114,14 +151,6 @@ private:
     void mouseReleaseEvent(QMouseEvent *event) override;
     void mouseDoubleClickEvent(QMouseEvent *event) override;
     void contextMenuEvent(QContextMenuEvent *event) override;
-
-    // Custom editor behavior
-    void insertBlock();
-
-    // Clipboard functions
-    void copy();
-    void paste();
-    void cut();
 
     void updatePasteAction();
 
@@ -149,10 +178,6 @@ private:
 
     // Context menu (opens on left click)
     QMenu *m_contextMenu;
-
-    // X coordinate of the cursor for navigating with Up/Down keys
-    qreal m_cursorX;
-    bool m_keepCursorX;
 
     // Hyperlink related keyboard / mouse event properties
     bool m_ctrlPressed;

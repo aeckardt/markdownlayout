@@ -4,6 +4,7 @@
 #include <QWidget>
 
 class QComboBox;
+class QTextBlock;
 class QToolBar;
 
 class GradientButton;
@@ -32,8 +33,9 @@ private:
 
 private slots:
     void onFontChanged(const QFont &font);
-    void onBlockFormatChanged();
+    void onBlockFormatChanged(const QTextBlock &block);
     void setHeadingLevel(int level);
+    void updateBlockFormatButtons();
 
 private:
     static QImage loadIconImage(const QString &iconName);

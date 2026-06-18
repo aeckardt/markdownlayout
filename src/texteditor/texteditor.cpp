@@ -35,11 +35,9 @@ using namespace TextEditorStyle;
 
 TextEditor::TextEditor(QWidget *parent)
     : QTextEdit(parent),
-      m_cursorX(-1),
-      m_keepCursorX(false),
       m_ctrlPressed(false)
 {
-    // Connect signals
+    // Connect signals to update actions / char format
     connect(this, &QTextEdit::currentCharFormatChanged,
             this, &TextEditor::onCurrentCharFormatChanged);
     connect(this, &QTextEdit::cursorPositionChanged,
@@ -56,27 +54,6 @@ TextEditor::TextEditor(QWidget *parent)
     setViewportMargins(VIEWPORT_MARGIN, VIEWPORT_MARGIN, VIEWPORT_MARGIN, VIEWPORT_MARGIN);
     setStyleSheet(QStringLiteral("QTextEdit { background: white; }"));
 #endif
-}
-
-void TextEditor::setDocument(QTextDocument *document)
-{
-    Q_ASSERT(document);
-
-#ifdef DOCUMENT_INDENT_WIDTH
-    // Change tab indent width (which me thinks, looks better than such a wide tab)
-    document->setIndentWidth(DOCUMENT_INDENT_WIDTH);
-#endif
-
-    // Assign the imported document to the editor
-    QTextEdit::setDocument(document);
-
-    // Update undo, redo actions (the undoAvailable signal might not have been emitted)
-    m_undoAction->setEnabled(document->isUndoAvailable());
-    m_redoAction->setEnabled(document->isRedoAvailable());
-
-    // Move cursor to the start
-    moveCursor(QTextCursor::Start);
-    ensureCursorVisible();
 }
 
 void TextEditor::setupActions()
@@ -175,6 +152,179 @@ void TextEditor::setupContextMenu()
     m_contextMenu->addAction(m_removeAction);
 }
 
+void TextEditor::setDocument(QTextDocument *document)
+{
+    Q_ASSERT(document);
+
+#ifdef DOCUMENT_INDENT_WIDTH
+    // Change tab indent width (which me thinks, looks better than such a wide tab)
+    document->setIndentWidth(DOCUMENT_INDENT_WIDTH);
+#endif
+
+    // Assign the imported document to the editor
+    QTextEdit::setDocument(document);
+
+    // Update undo, redo actions (the undoAvailable signal might not have been emitted)
+    m_undoAction->setEnabled(document->isUndoAvailable());
+    m_redoAction->setEnabled(document->isRedoAvailable());
+
+    // Move cursor to the start
+    moveCursor(QTextCursor::Start);
+    ensureCursorVisible();
+}
+
+TextEditor::BlockType TextEditor::blockType(const QTextBlock &block) const
+{
+    const QTextBlockFormat blockFmt = block.blockFormat();
+    if (blockFmt.headingLevel() > 0)
+        return static_cast<BlockType>((int)BlockType::Heading1 + blockFmt.headingLevel() - 1);
+    if (blockFmt.objectIndex() != -1 && block.textList())
+        return BlockType::TextList;
+    if (blockFmt.hasProperty(QTextFormat::BlockQuoteLevel))
+        return BlockType::BlockQuote;
+    if (blockFmt.hasProperty(QTextFormat::BlockTrailingHorizontalRulerWidth))
+        return BlockType::HorizontalRuler;
+    return BlockType::Paragraph;
+}
+
+int TextEditor::headingLevel(BlockType type)
+{
+    if (type < Heading1 || type > Heading4)
+        return 0;
+    return (int)type - (int)Heading1 + 1;
+}
+
+/*
+ * Override the copy function to generate custom HTML mime data that includes indent levels,
+ * headings, and list points.
+ */
+void TextEditor::copy()
+{
+    QMimeData *mimeData = new QMimeData;
+    QTextCursor cursor = textCursor();
+
+    // Export text as HTML
+    QString selectionAsHtml = HtmlExporter::exportDocument(document(), &cursor);
+    mimeData->setHtml(selectionAsHtml);
+
+    // Export text as plain
+    QTextDocumentFragment fragment(cursor);
+    mimeData->setText(fragment.toPlainText());
+
+    QGuiApplication::clipboard()->setMimeData(mimeData);
+}
+
+/*
+ * Copy the whole document as a Markdown string.
+ */
+void TextEditor::copyAsMarkdown()
+{
+    QMimeData *mimeData = new QMimeData;
+
+    // Export text as Markdown
+    QString markdown = MarkdownExporter::exportDocument(document());
+    mimeData->setText(markdown);
+    mimeData->setData("text/markdown", markdown.toUtf8());
+
+    QGuiApplication::clipboard()->setMimeData(mimeData);
+}
+
+void TextEditor::paste()
+{
+    QTextCursor cursor = textCursor();
+    QTextDocumentFragment fragment;
+
+    const QMimeData *mimeData = QGuiApplication::clipboard()->mimeData();
+    if (mimeData->hasHtml()) {
+        QTextDocument *contentDoc = documentFromHtml(mimeData->html());
+        fragment = QTextDocumentFragment(contentDoc);
+    } else {
+        QString text = mimeData->text();
+        if (!text.isNull())
+            fragment = QTextDocumentFragment::fromPlainText(text);
+    }
+
+    if (!fragment.isEmpty()) {
+        cursor.insertFragment(fragment);
+        ensureCursorVisible();
+    }
+}
+
+/*
+ * Analogous to the copy function - just with selection removal after the operation.
+ */
+void TextEditor::cut()
+{
+    copy();
+
+    QTextCursor cursor = textCursor();
+    cursor.removeSelectedText();
+}
+
+void TextEditor::insertHyperlink()
+{
+    QTextCursor cursor = textCursor();
+    HyperlinkPtr link = getLinkUnderCursor(cursor);
+    if (link) {
+        // Edit link under cursor, if available
+        m_editLinkAction->setData(QVariant::fromValue(link));
+        editHyperlink();
+        return;
+    }
+
+    LinkEditorDialog editor(tr("Insert link"));
+    if (editor.exec() == QDialog::Accepted) {
+        // Add hyperlink with specific char format
+        QTextCursor cursor = textCursor();
+        QTextCharFormat charFmt = cursor.charFormat();
+        charFmt.setAnchor(true);
+        charFmt.setAnchorHref(editor.linkUrl());
+        charFmt.setForeground(linkColor());
+
+        cursor.insertText(editor.caption(), charFmt);
+
+        // Normalize char format after inserting the link
+        charFmt = QTextCharFormat();
+        charFmt.setAnchor(false);
+        charFmt.setAnchorHref({});
+        charFmt.setForeground(QColor("black"));
+        cursor.mergeCharFormat(charFmt);
+    }
+}
+
+void TextEditor::editHyperlink()
+{
+    LinkEditorDialog editor(tr("Edit link"));
+
+    HyperlinkPtr link = m_editLinkAction->data().value<HyperlinkPtr>();
+    editor.setLinkUrl(link->href);
+    editor.setCaption(link->text);
+    editor.selectCaption();
+
+    if (editor.exec() == QDialog::Accepted) {
+        QTextCursor cursor = textCursor();
+        QTextCharFormat charFmt = cursor.charFormat();
+        charFmt.setAnchor(true);
+        charFmt.setAnchorHref(editor.linkUrl());
+        charFmt.setForeground(linkColor());
+
+        cursor.setPosition(link->position);
+        cursor.setPosition(link->position + link->length, QTextCursor::KeepAnchor);
+        cursor.insertText(editor.caption(), charFmt);
+
+        charFmt = QTextCharFormat();
+        charFmt.setAnchor(false);
+        charFmt.setAnchorHref({});
+        charFmt.setForeground(QColor("black"));
+        cursor.mergeCharFormat(charFmt);
+    }
+}
+
+void TextEditor::insertEmoji()
+{
+    // TODO: Implement insertEmoji
+}
+
 void TextEditor::onCurrentCharFormatChanged(const QTextCharFormat &format)
 {
     emit fontChanged(format.font());
@@ -186,14 +336,7 @@ void TextEditor::onCurrentCharFormatChanged(const QTextCharFormat &format)
 
 void TextEditor::onCursorPositionChanged()
 {
-    emit blockFormatChanged();
-
     const QTextCursor cursor = textCursor();
-
-    if (!m_keepCursorX)
-        updateCursorX(cursor);
-    else
-        m_keepCursorX = false;
 
     if (cursor.charFormat().isAnchor() && !cursor.hasSelection()) {
         HyperlinkPtr linkRef = getLinkUnderCursor(cursor);
@@ -309,54 +452,54 @@ void TextEditor::clearStrongOnSelection()
             charFmt.setFontWeight(blockDefaultFontWeight(block));
         return charFmt;
     };
-    applyFragmentChangesToSelection(cursor, clearStrongModifier);
+    applyFragmentChangesToSelection(clearStrongModifier);
 }
 
-void TextEditor::applyHeadingCharFormat(const QTextBlock &block, int headingLevel)
+QTextCharFormat TextEditor::headingCharFormat(int headingLevel, QTextCharFormat charFmt)
 {
-    auto headingFormatModifier = [&](const QTextBlock &, QTextCharFormat charFmt){
-        // Set / remove heading-specific visual formatting
-        // depending on headingLevel (0 -> no heading)
-        bool isStrong = isMarkdownStrong(charFmt);
-        if (headingLevel > 0) {
-            charFmt.setFontWeight(
-                        isStrong
-                        ? StrongFontWeight
-                        : HeadingFontWeight);
-            charFmt.setProperty(QTextCharFormat::Property::FontSizeAdjustment, 4 - headingLevel);
-        } else {
-            charFmt.setFontWeight(
-                        isStrong
-                        ? StrongFontWeight
-                        : NormalFontWeight);
-            charFmt.clearProperty(QTextCharFormat::Property::FontSizeAdjustment);
-        }
-        return charFmt;
-    };
-    applyFragmentChangesToBlock(block, headingFormatModifier);
+    // Set / remove heading-specific visual formatting
+    // depending on headingLevel (0 -> no heading)
+    bool isStrong = isMarkdownStrong(charFmt);
+    if (headingLevel > 0) {
+        charFmt.setFontWeight(
+                    isStrong
+                    ? StrongFontWeight
+                    : HeadingFontWeight);
+        charFmt.setProperty(QTextCharFormat::Property::FontSizeAdjustment, 4 - headingLevel);
+    } else {
+        charFmt.setFontWeight(
+                    isStrong
+                    ? StrongFontWeight
+                    : NormalFontWeight);
+        charFmt.clearProperty(QTextCharFormat::Property::FontSizeAdjustment);
+    }
+    return charFmt;
 }
 
-void TextEditor::applyFragmentChangesToSelection(QTextCursor &cursor, const FormatModifier &modifier)
+void TextEditor::applyHeadingCharFormatToBlock(const QTextBlock &block, int headingLevel)
 {
-    cursor.beginEditBlock();
+    applyFragmentChangesToBlock(block, [&](const QTextBlock &, QTextCharFormat charFmt) {
+        return headingCharFormat(headingLevel, charFmt);
+    });
+}
+
+void TextEditor::applyFragmentChangesToSelection(const FormatModifier &modifier)
+{
+    QTextCursor cursor = textCursor();
     applyFragmentChangesToRange(
-                selectedBlocks(cursor),
+                selectedBlocks(),
                 cursor.selectionStart(),
                 cursor.selectionEnd(),
                 modifier);
-    cursor.endEditBlock();
 }
 
 void TextEditor::applyFragmentChangesToBlock(const QTextBlock &block, const FormatModifier &modifier)
 {
-    QTextCursor cursor(block);
-    cursor.beginEditBlock();
     applyFragmentChangesToRange(
                 {block},
                 block.position(),
                 block.position() + block.length(),
                 modifier);
-    cursor.endEditBlock();
 }
 
 void TextEditor::applyFragmentChangesToRange(const QVector<QTextBlock> &blocks,
@@ -386,11 +529,13 @@ void TextEditor::applyFragmentChangesToRange(const QVector<QTextBlock> &blocks,
     }
 
     QTextCursor localCursor(document());
+    localCursor.beginEditBlock();
     for (const CharFormatUpdate &update : updates) {
         localCursor.setPosition(update.start);
         localCursor.setPosition(update.end, QTextCursor::MoveMode::KeepAnchor);
-        localCursor.setCharFormat(update.charFmt);
+        localCursor.setCharFormat(update.newCharFmt);
     }
+    localCursor.endEditBlock();
 }
 
 void TextEditor::mergeFormatOnSelection(const QTextCharFormat &charFmt, bool selectWord)
@@ -414,302 +559,139 @@ void TextEditor::mergeFormatOnSelection(const QTextCharFormat &charFmt, bool sel
     cursor.endEditBlock();
 }
 
-void TextEditor::insertHyperlink()
+void TextEditor::setBlockType(BlockType type, ScopePolicy policy, bool toggle)
 {
-    QTextCursor cursor = textCursor();
-    HyperlinkPtr link = getLinkUnderCursor(cursor);
-    if (link) {
-        // Edit link under cursor, if available
-        m_editLinkAction->setData(QVariant::fromValue(link));
-        editHyperlink();
+    if (policy == ScopePolicy::CurrentBlock) {
+        setBlockTypeForBlock(textCursor().block(), type, toggle);
         return;
     }
 
-    LinkEditorDialog editor(tr("Insert link"));
-    if (editor.exec() == QDialog::Accepted) {
-        // Add hyperlink with specific char format
-        QTextCursor cursor = textCursor();
-        QTextCharFormat charFmt = cursor.charFormat();
-        charFmt.setAnchor(true);
-        charFmt.setAnchorHref(editor.linkUrl());
-        charFmt.setForeground(linkColor());
+    QVector<QTextBlock> blocks = selectedBlocks();
 
-        cursor.insertText(editor.caption(), charFmt);
-
-        // Normalize char format after inserting the link
-        charFmt = QTextCharFormat();
-        charFmt.setAnchor(false);
-        charFmt.setAnchorHref({});
-        charFmt.setForeground(QColor("black"));
-        cursor.mergeCharFormat(charFmt);
+    bool allOfType = true;
+    for (const QTextBlock &block : blocks) {
+        if (blockType(block) != type) {
+            allOfType = false;
+            break;
+        }
     }
-}
 
-void TextEditor::editHyperlink()
-{
-    LinkEditorDialog editor(tr("Edit link"));
+    BlockType newType;
+    if (allOfType) {
+        if (!toggle)
+            return;
+        newType = BlockType::Paragraph;
+    } else
+        newType = type;
 
-    HyperlinkPtr link = m_editLinkAction->data().value<HyperlinkPtr>();
-    editor.setLinkUrl(link->href);
-    editor.setCaption(link->text);
-    editor.selectCaption();
-
-    if (editor.exec() == QDialog::Accepted) {
-        QTextCursor cursor = textCursor();
-        QTextCharFormat charFmt = cursor.charFormat();
-        charFmt.setAnchor(true);
-        charFmt.setAnchorHref(editor.linkUrl());
-        charFmt.setForeground(linkColor());
-
-        cursor.setPosition(link->position);
-        cursor.setPosition(link->position + link->length, QTextCursor::KeepAnchor);
-        cursor.insertText(editor.caption(), charFmt);
-
-        charFmt = QTextCharFormat();
-        charFmt.setAnchor(false);
-        charFmt.setAnchorHref({});
-        charFmt.setForeground(QColor("black"));
-        cursor.mergeCharFormat(charFmt);
-    }
-}
-
-void TextEditor::insertEmoji()
-{
-    // TODO: Implement insertEmoji
-}
-
-/*
- * Indent/Unindent affects selected list items.
- * Non-list paragraphs inside the selection are ignored.
- * If no selected block is a list item, the action does nothing.
- */
-void TextEditor::adjustListIndentation(int delta)
-{
     QTextCursor cursor = textCursor();
-    QVector<QTextBlock> blocks = selectedBlocks(cursor);
-
-    // Remove all blocks from selection that are not list items
-    for (int i = blocks.size() - 1; i >= 0; --i) {
-        const QTextBlock &block = blocks.at(i);
-        if (!block.isValid() || !block.textList())
-            blocks.removeAt(i);
-    }
-
-    if (blocks.isEmpty())
-        return;
-
     cursor.beginEditBlock();
     for (const QTextBlock &block : blocks)
-        adjustListBlockIndentation(block, delta);
+        setBlockTypeForBlock(block, newType);
     cursor.endEditBlock();
-
-    emit blockFormatChanged();
 }
 
-void TextEditor::adjustListBlockIndentation(const QTextBlock &block, int delta)
+void TextEditor::setBlockTypeForBlock(const QTextBlock &block, BlockType type, bool toggle)
 {
+    BlockType typeBefore = blockType(block);
+    if (typeBefore == type) {
+        if (toggle)
+            setBlockTypeForBlock(block, BlockType::Paragraph);
+        return;
+    }
+
+    // Clear old format
     QTextBlockFormat blockFmt = block.blockFormat();
-    int currentIndent = blockFmt.indent();
-    int newIndent = std::max(0, currentIndent + delta);
+    switch (typeBefore) {
+    case BlockType::Heading1:
+    case BlockType::Heading2:
+    case BlockType::Heading3:
+    case BlockType::Heading4:
+        blockFmt.setHeadingLevel(0);
+        clearHeadingCharFormat(block);
+        break;
+    case BlockType::TextList: {
+        QTextList *textList = block.textList();
+        if (textList)
+            textList->remove(block);
+        else
+            qWarning() << QStringLiteral("No textList object available in block with type TextList");
 
-    if (currentIndent == newIndent)
-        return;
-
-    blockFmt.setIndent(newIndent);
-
-    QTextCursor blockCursor(block);
-    blockCursor.setBlockFormat(blockFmt);
-
-    if (newIndent > 0)
-        setListStyle(blockCursor, LowerLevelListStyle);
-    else
-        setListStyle(blockCursor, TopLevelListStyle);
-}
-
-void TextEditor::setHeadingLevel(int level)
-{
-    QTextCursor cursor = textCursor();
-    int currentLevel = cursor.blockFormat().headingLevel();
-    if (currentLevel == level)
-        // Do nothing
-        return;
-
-    cursor.beginEditBlock();
-
-    QTextBlockFormat blockFmt = cursor.blockFormat();
-    QTextList *textList = cursor.currentList();
-    if (textList) {
-        // Remove list
         blockFmt.setObjectIndex(-1);
         blockFmt.setIndent(0);
         blockFmt.clearProperty(QTextFormat::ListStyle);
+
+        break;
+    }
+    case BlockType::BlockQuote:
+        blockFmt.clearProperty(QTextFormat::BlockQuoteLevel);
+        break;
+    case BlockType::HorizontalRuler:
+        blockFmt.clearProperty(QTextFormat::BlockTrailingHorizontalRulerWidth);
+#ifdef HORIZONTAL_RULER_COLOR
+        blockFmt.clearProperty(QTextFormat::BackgroundBrush);
+#endif
+        break;
+    default:
+        // Nothing to do for paragraph
+        ;
     }
 
-    // Set heading level for block
-    blockFmt.setHeadingLevel(level);
-    cursor.setBlockFormat(blockFmt);
+    // Set new format
+    QTextCursor localCursor(block);
+    localCursor.beginEditBlock();
 
-    // Apply charformat modification
-    applyHeadingCharFormat(cursor.block(), level);
-
-    cursor.endEditBlock();
-
-    emit blockFormatChanged();
-}
-
-void TextEditor::removeBlockStyle()
-{
-    QTextCursor cursor = textCursor();
-    QVector<QTextBlock> blocks = selectedBlocks(cursor);
-
-    cursor.beginEditBlock();
-    for (const QTextBlock &block : blocks)
-        removeBlockStyleFromBlock(block);
-    cursor.endEditBlock();
-
-    emit blockFormatChanged();
-}
-
-void TextEditor::removeBlockStyleFromBlock(const QTextBlock &block)
-{
-    QTextCursor blockCursor(block);
-    QTextBlockFormat blockFmt = block.blockFormat();
-    QTextList *textList = block.textList();
-
-    if (textList) {
-        textList->remove(block);
-        blockFmt.setObjectIndex(-1);
-        blockFmt.setIndent(0);
-        blockFmt.clearProperty(QTextFormat::ListStyle);
-    } else if (blockFmt.headingLevel() > 0) {
-        blockFmt.setHeadingLevel(0);
-        clearHeadingCharFormat(block);
+    switch (type) {
+    case BlockType::Heading1:
+    case BlockType::Heading2:
+    case BlockType::Heading3:
+    case BlockType::Heading4: {
+        int headingLevel = (int)type - (int)BlockType::Heading1 + 1;
+        blockFmt.setHeadingLevel(headingLevel);
+        if (block.length() > 0)
+            applyHeadingCharFormatToBlock(block, headingLevel);
+        // TODO: Set cursor char format for heading (especially if nothing is selected)
+//        if (block == textCursor().block()) {
+//            QTextCharFormat charFmt = headingCharFormat(headingLevel);
+//            mergeFormatOnSelection(charFmt);
+//        }
+        break;
     }
-
-    blockCursor.setBlockFormat(blockFmt);
-}
-
-void TextEditor::toggleList()
-{
-    QTextCursor cursor = textCursor();
-    const QTextBlock block = cursor.block();
-    QTextBlockFormat blockFmt = block.blockFormat();
-
-    cursor.beginEditBlock();
-
-    if (blockFmt.headingLevel() > 0) {
-        // Remove heading format
-        blockFmt.setHeadingLevel(0);
-
-        // Remove char format used for headings
-        clearHeadingCharFormat(block);
-    }
-
-    QTextList *textList = cursor.currentList();
-    if (!textList) {
+    case BlockType::TextList: {
         // Setup new list
         QTextListFormat listFmt;
-        QTextListFormat::Style listStyle;
+        QTextListFormat::Style listStyle = TopLevelListStyle;
         listFmt.setIndent(1);
-        if (blockFmt.indent() == 0)
-            listStyle = TopLevelListStyle;
-        else
-            listStyle = LowerLevelListStyle;
         listFmt.setProperty(QTextFormat::ListStyle, listStyle);
-        textList = cursor.createList(listFmt);
+
+        QTextList *textList = localCursor.createList(listFmt);
 
         blockFmt.setObjectIndex(textList->objectIndex());
-    } else {
-        // Remove list at current block
-        textList->remove(block);
-
-        blockFmt.setObjectIndex(-1);
-        blockFmt.setIndent(0);
-        // TODO: Check if QTextBlockFormat actually has QTextFormat::ListStyle as a property
-        blockFmt.clearProperty(QTextFormat::ListStyle);
+        break;
     }
-
-    cursor.setBlockFormat(blockFmt);
-    cursor.endEditBlock();
-
-    emit blockFormatChanged();
-}
-
-void TextEditor::toggleBlockQuote()
-{
-    QTextCursor cursor = textCursor();
-    const QTextBlock block = cursor.block();
-    QTextBlockFormat blockFmt = block.blockFormat();
-
-    cursor.beginEditBlock();
-
-    if (blockFmt.headingLevel() > 0) {
-        // Remove heading format
-        blockFmt.setHeadingLevel(0);
-
-        // Remove char format used for headings
-        clearHeadingCharFormat(block);
-    }
-
-    QTextList *textList = cursor.currentList();
-    if (textList) {
-        // Remove list at current block
-        textList->remove(block);
-
-        blockFmt.setObjectIndex(-1);
-        blockFmt.setIndent(0);
-        // TODO: Check if QTextBlockFormat actually has QTextFormat::ListStyle as a property
-        blockFmt.clearProperty(QTextFormat::ListStyle);
-    }
-
-    // Set / clear blockquote property
-    if (blockFmt.hasProperty(QTextFormat::BlockQuoteLevel))
-        blockFmt.clearProperty(QTextFormat::BlockQuoteLevel);
-    else
+    case BlockType::BlockQuote:
         blockFmt.setProperty(QTextFormat::BlockQuoteLevel, 1);
+        break;
+    case BlockType::HorizontalRuler:
+        // Remove line
+        localCursor.select(QTextCursor::LineUnderCursor);
+        localCursor.removeSelectedText();
 
-    cursor.setBlockFormat(blockFmt);
-    cursor.endEditBlock();
-
-    emit blockFormatChanged();
-}
-
-void TextEditor::makeHorizontalRuler()
-{
-    QTextCursor cursor = textCursor();
-    const QTextBlock block = cursor.block();
-    QTextBlockFormat blockFmt = block.blockFormat();
-
-    cursor.beginEditBlock();
-
-    if (blockFmt.headingLevel() > 0)
-        // Remove heading format
-        blockFmt.setHeadingLevel(0);
-
-    QTextList *textList = cursor.currentList();
-    if (textList) {
-        // Remove list property at current block
-        textList->remove(block);
-        blockFmt.setObjectIndex(-1);
-    }
-
-    // Set horizontal ruler property
-    blockFmt.setProperty(QTextFormat::BlockTrailingHorizontalRulerWidth, horizontalRulerWidth());
+        blockFmt.setProperty(QTextFormat::BlockTrailingHorizontalRulerWidth, horizontalRulerWidth());
 #ifdef HORIZONTAL_RULER_COLOR
-    blockFmt.setProperty(QTextFormat::BackgroundBrush, horizontalRulerColor());
+        blockFmt.setProperty(QTextFormat::BackgroundBrush, horizontalRulerColor());
 #endif
 
-    // Remove line
-    cursor.select(QTextCursor::LineUnderCursor);
-    cursor.removeSelectedText();
+        break;
+    default:
+        // Nothing to do for paragraph
+        ;
+    }
 
-    // Update block format
-    cursor.setBlockFormat(blockFmt);
+    localCursor.setBlockFormat(blockFmt);
+    localCursor.endEditBlock();
 
-    // Add new line
-    cursor.insertBlock(defaultBlockFormat(), defaultCharFormat());
-
-    cursor.endEditBlock();
+    emit blockFormatChanged(block);
 }
 
 void TextEditor::setListStyle(QTextCursor &cursor, QTextListFormat::Style style)
@@ -727,8 +709,58 @@ void TextEditor::setListStyle(QTextCursor &cursor, QTextListFormat::Style style)
     cursor.setBlockFormat(blockFmt);
 }
 
-QVector<QTextBlock> TextEditor::selectedBlocks(const QTextCursor &cursor) const
+/*
+ * Indent/Unindent affects selected list items.
+ * Non-list paragraphs inside the selection are ignored.
+ * If no selected block is a list item, the action does nothing.
+ */
+void TextEditor::adjustListIndentation(int delta)
 {
+    QTextCursor cursor = textCursor();
+    QVector<QTextBlock> blocks = selectedBlocks();
+
+    // Remove all blocks from selection that are not list items
+    for (int i = blocks.size() - 1; i >= 0; --i) {
+        const QTextBlock &block = blocks.at(i);
+        if (!block.isValid() || !block.textList())
+            blocks.removeAt(i);
+    }
+
+    if (blocks.isEmpty())
+        return;
+
+    cursor.beginEditBlock();
+    for (const QTextBlock &block : blocks)
+        adjustListIndentationForBlock(block, delta);
+    cursor.endEditBlock();
+}
+
+void TextEditor::adjustListIndentationForBlock(const QTextBlock &block, int delta)
+{
+    QTextBlockFormat blockFmt = block.blockFormat();
+    int currentIndent = blockFmt.indent();
+    int newIndent = std::max(0, currentIndent + delta);
+
+    if (currentIndent == newIndent)
+        return;
+
+    blockFmt.setIndent(newIndent);
+
+    QTextCursor blockCursor(block);
+    blockCursor.setBlockFormat(blockFmt);
+
+    if (newIndent > 0)
+        setListStyle(blockCursor, LowerLevelListStyle);
+    else
+        setListStyle(blockCursor, TopLevelListStyle);
+
+    emit blockFormatChanged(block);
+}
+
+QVector<QTextBlock> TextEditor::selectedBlocks() const
+{
+    QTextCursor cursor = textCursor();
+
     int start = cursor.selectionStart();
     int end = cursor.selectionEnd();
 
@@ -755,6 +787,39 @@ QVector<QTextBlock> TextEditor::selectedBlocks(const QTextCursor &cursor) const
     }
 
     return blocks;
+}
+
+/*
+ * Ensure custom behavior when adding a new line with keyboard.
+ */
+void TextEditor::insertBlock()
+{
+    QTextCursor cursor = textCursor();
+    QTextBlock block = cursor.block();
+    BlockType type = blockType(block);
+    int posInBlock = cursor.positionInBlock();
+
+    cursor.beginEditBlock();
+    if (posInBlock == 0) {
+        cursor.setCharFormat(defaultCharFormat());
+
+        // The cursor is at the beginning of the line
+        // Move all char and block formatting to the new line
+        cursor.insertBlock();
+
+        // If previous block has been a heading or a blockquote
+        // Set default format there
+        if ((type >= Heading1 && type <= Heading4) || type == BlockQuote) {
+            cursor.setPosition(cursor.position() - 1);
+            cursor.setBlockFormat(defaultBlockFormat());
+        }
+    } else if (type == TextList)
+        cursor.insertBlock(block.blockFormat());
+    else
+        cursor.insertBlock(defaultBlockFormat(), defaultCharFormat());
+    cursor.endEditBlock();
+
+    ensureCursorVisible();
 }
 
 HyperlinkPtr TextEditor::getLinkUnderCursor(const QTextCursor &cursor)
@@ -826,64 +891,59 @@ void TextEditor::keyPressEvent(QKeyEvent *event)
     case Qt::Key_Space: {
         QTextCursor cursor = textCursor();
         const QTextBlock block = cursor.block();
-        QTextList *textList = cursor.currentList();
-        if (!textList && cursor.position() - block.position() == 1) {
+        BlockType type = blockType(block);
+        if (type == BlockType::Paragraph) {
+            static const QMap<QString, BlockType> typeMarker = {
+                {QStringLiteral("*"), BlockType::TextList},
+                {QStringLiteral(">"), BlockType::BlockQuote},
+                {QStringLiteral("#"), BlockType::Heading1},
+                {QStringLiteral("##"), BlockType::Heading2},
+                {QStringLiteral("###"), BlockType::Heading3},
+                {QStringLiteral("####"), BlockType::Heading4}
+            };
+            static const QList<QString> keys = typeMarker.keys();
+
+            BlockType newType = type;
             auto it = block.begin();
-            if (it.fragment().text().startsWith(QStringLiteral("*"))) {
-                // Create a new list if a line starts with "* "
-                // First: remove the asterisk
-                QTextCursor localCursor(cursor);
-                localCursor.beginEditBlock();
-                localCursor.setPosition(block.position());
-                localCursor.setPosition(block.position() + 1, QTextCursor::MoveMode::KeepAnchor);
-                localCursor.removeSelectedText();
-
-                // Second: create a list
-                toggleList();
-                localCursor.endEditBlock();
-
-                return;
+            const QStringView text(it.fragment().text());
+            int markerLength = 0;
+            for (const QString &marker : keys) {
+                if (cursor.position() - block.position() == marker.length()
+                        && text.startsWith(marker)) {
+                    newType = typeMarker.value(marker);
+                    markerLength = marker.length();
+                    break;
+                }
             }
-            else if (it.fragment().text().startsWith(QStringLiteral(">"))) {
-                // Create a blockquote if a line starts with "> "
+
+            if (newType != type) {
+                // Create a new block format if line starts with a specifc marker
                 QTextCursor localCursor(cursor);
                 localCursor.beginEditBlock();
                 localCursor.setPosition(block.position());
-                localCursor.setPosition(block.position() + 1, QTextCursor::MoveMode::KeepAnchor);
+                localCursor.setPosition(block.position() + markerLength, QTextCursor::MoveMode::KeepAnchor);
                 localCursor.removeSelectedText();
-
-                // Second: create a list
-                toggleBlockQuote();
+                setBlockTypeForBlock(block, newType);
                 localCursor.endEditBlock();
-
                 return;
             }
         }
+        break;
     }
     case Qt::Key_Backspace: {
         QTextCursor cursor = textCursor();
         const QTextBlock block = cursor.block();
-        QTextBlockFormat blockFmt = block.blockFormat();
         if (cursor.position() == block.position()) {
-            QTextList *textList = cursor.currentList();
-            if (textList) {
-                // Remove the list bullet from the current block
+            BlockType type = blockType(block);
+            if (type == BlockType::TextList || type == BlockType::BlockQuote) {
                 cursor.beginEditBlock();
                 cursor.removeSelectedText();
-                blockFmt.setObjectIndex(-1);
-                blockFmt.setIndent(0);
-                blockFmt.clearProperty(QTextFormat::ListStyle);
-                cursor.endEditBlock();
-                return;
-            } else if (blockFmt.hasProperty(QTextFormat::BlockQuoteLevel)) {
-                cursor.beginEditBlock();
-                cursor.removeSelectedText();
-                blockFmt.clearProperty(QTextFormat::BlockQuoteLevel);
-                cursor.setBlockFormat(blockFmt);
+                setBlockTypeForBlock(block, BlockType::Paragraph);
                 cursor.endEditBlock();
                 return;
             }
         }
+        break;
     }
     case Qt::Key_Minus: {
         QTextCursor cursor = textCursor();
@@ -894,9 +954,11 @@ void TextEditor::keyPressEvent(QKeyEvent *event)
             if (it.fragment().text().startsWith(QStringLiteral("--"))) {
                 // Create a horizontal ruler if the line starts with three dashes
                 makeHorizontalRuler();
+                insertBlock();
                 return;
             }
         }
+        break;
     }
     default:
         ;
@@ -908,20 +970,6 @@ void TextEditor::keyPressEvent(QKeyEvent *event)
     updateOverrideCursor();
 
     QTextEdit::keyPressEvent(event);
-}
-
-void TextEditor::updateCursorX(const QTextCursor &cursor)
-{
-    const QTextBlock block = cursor.block();
-    const QTextLayout *layout = block.layout();
-
-    int pos = cursor.position() - block.position();
-
-    const QTextLine line = layout->lineForTextPosition(pos);
-    if (line.isValid())
-        m_cursorX = line.cursorToX(pos);
-    else
-        m_cursorX = -1;
 }
 
 void TextEditor::keyReleaseEvent(QKeyEvent *event)
@@ -1037,106 +1085,6 @@ void TextEditor::contextMenuEvent(QContextMenuEvent *event)
     m_contextMenuSeparator->setVisible(isLink);
 
     m_contextMenu->exec(event->globalPos());
-}
-
-/*
- * Ensure custom behavior when adding a new line with keyboard.
- */
-void TextEditor::insertBlock()
-{
-    QTextCursor cursor = textCursor();
-    QTextBlockFormat blockFmt = cursor.blockFormat();
-    int posInBlock = cursor.positionInBlock();
-
-    cursor.beginEditBlock();
-    if (posInBlock == 0) {
-        cursor.setCharFormat(defaultCharFormat());
-
-        // The cursor is at the beginning of the line
-        // Thus all the content is going to move to the newly inserted line
-        // -> Move the block and char formatting as well
-        cursor.insertBlock();
-
-        // If previous block has been a heading or a blockquote
-        // Set default format there
-        if (blockFmt.headingLevel() > 0 || blockFmt.hasProperty(QTextFormat::BlockQuoteLevel)) {
-            cursor.setPosition(cursor.position() - 1);
-            cursor.setBlockFormat(defaultBlockFormat());
-        }
-    } else if (blockFmt.objectIndex() != -1)
-        cursor.insertBlock(blockFmt);
-    else
-        cursor.insertBlock(defaultBlockFormat(), defaultCharFormat());
-    cursor.endEditBlock();
-
-    ensureCursorVisible();
-}
-
-/*
- * Override the copy function to generate custom HTML mime data that includes indent levels,
- * headings, and list points.
- */
-void TextEditor::copy()
-{
-    QMimeData *mimeData = new QMimeData;
-    QTextCursor cursor = textCursor();
-
-    // Export text as HTML
-    QString selectionAsHtml = HtmlExporter::exportDocument(document(), &cursor);
-    mimeData->setHtml(selectionAsHtml);
-
-    // Export text as plain
-    QTextDocumentFragment fragment(cursor);
-    mimeData->setText(fragment.toPlainText());
-
-    QGuiApplication::clipboard()->setMimeData(mimeData);
-}
-
-/*
- * Copy the whole document as a Markdown string.
- */
-void TextEditor::copyAsMarkdown()
-{
-    QMimeData *mimeData = new QMimeData;
-
-    // Export text as Markdown
-    QString markdown = MarkdownExporter::exportDocument(document());
-    mimeData->setText(markdown);
-    mimeData->setData("text/markdown", markdown.toUtf8());
-
-    QGuiApplication::clipboard()->setMimeData(mimeData);
-}
-
-void TextEditor::paste()
-{
-    QTextCursor cursor = textCursor();
-    QTextDocumentFragment fragment;
-
-    const QMimeData *mimeData = QGuiApplication::clipboard()->mimeData();
-    if (mimeData->hasHtml()) {
-        QTextDocument *contentDoc = documentFromHtml(mimeData->html());
-        fragment = QTextDocumentFragment(contentDoc);
-    } else {
-        QString text = mimeData->text();
-        if (!text.isNull())
-            fragment = QTextDocumentFragment::fromPlainText(text);
-    }
-
-    if (!fragment.isEmpty()) {
-        cursor.insertFragment(fragment);
-        ensureCursorVisible();
-    }
-}
-
-/*
- * Analogous to the copy function - just with selection removal after the operation.
- */
-void TextEditor::cut()
-{
-    copy();
-
-    QTextCursor cursor = textCursor();
-    cursor.removeSelectedText();
 }
 
 void TextEditor::updatePasteAction()

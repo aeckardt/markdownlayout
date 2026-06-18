@@ -11,6 +11,7 @@
 #include <QFontDatabase>
 #include <QIntValidator>
 #include <QList>
+#include <QTextBlock>
 #include <QToolBar>
 
 using namespace Qt::StringLiterals;
@@ -33,6 +34,7 @@ TextEditorWidget::TextEditorWidget(QWidget *parent)
     m_textEdit = new TextEditor(this);
     connect(m_textEdit, &TextEditor::fontChanged, this, &TextEditorWidget::onFontChanged);
     connect(m_textEdit, &TextEditor::blockFormatChanged, this, &TextEditorWidget::onBlockFormatChanged);
+    connect(m_textEdit, &TextEditor::cursorPositionChanged, this, &TextEditorWidget::updateBlockFormatButtons);
     layout->addWidget(m_textEdit);
 
     // Setup toolbuttons
@@ -176,18 +178,11 @@ void TextEditorWidget::onFontChanged(const QFont &font)
     m_comboSize->setEditText(sizeStr);
 }
 
-void TextEditorWidget::onBlockFormatChanged()
+void TextEditorWidget::onBlockFormatChanged(const QTextBlock &block)
 {
-    QTextCursor cursor = m_textEdit->textCursor();
-    const QTextBlockFormat blockFmt = cursor.blockFormat();
-    int headingLevel = blockFmt.headingLevel();
-    bool textList = cursor.currentList() != nullptr;
-
-    m_headingLevel1Button->setChecked(headingLevel == 1);
-    m_headingLevel2Button->setChecked(headingLevel == 2);
-    m_headingLevel3Button->setChecked(headingLevel == 3);
-    m_headingLevel4Button->setChecked(headingLevel == 4);
-    m_listButton->setChecked(textList);
+    const QTextBlock currentBlock = m_textEdit->textCursor().block();
+    if (block == currentBlock)
+        updateBlockFormatButtons();
 }
 
 void TextEditorWidget::setHeadingLevel(int level)
@@ -226,4 +221,16 @@ QImage TextEditorWidget::loadIconImage(const QString &iconName)
         filePath = QStringLiteral("icons/%1-24.png").arg(iconName);
 
     return QImage(filePath, "PNG");
+}
+
+void TextEditorWidget::updateBlockFormatButtons()
+{
+    const QTextBlock block = m_textEdit->textCursor().block();
+    TextEditor::BlockType type = m_textEdit->blockType(block);
+
+    m_headingLevel1Button->setChecked(type == TextEditor::Heading1);
+    m_headingLevel2Button->setChecked(type == TextEditor::Heading2);
+    m_headingLevel3Button->setChecked(type == TextEditor::Heading3);
+    m_headingLevel4Button->setChecked(type == TextEditor::Heading4);
+    m_listButton->setChecked(type == TextEditor::TextList);
 }
