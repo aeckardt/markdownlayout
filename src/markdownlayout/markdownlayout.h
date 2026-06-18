@@ -32,11 +32,6 @@ protected:
     void documentChanged(int, int, int) override;
 
 private:
-    LayoutMetrics m_metrics;
-    bool m_dirty;
-    QSizeF m_documentSize;
-    QMap<int, QRectF> m_blockRects;
-
     void ensureLayout();
     qreal layoutBlockText(QTextLayout *layout, qreal lineX, qreal lineWidth) const;
     qreal documentWidth() const;
@@ -49,6 +44,11 @@ private:
 
     QList<QTextLayout::FormatRange> selectionsForBlock(const PaintContext &context, QTextBlock block) const;
     int hitTestBlock(QTextBlock block, QPointF point, Qt::HitTestAccuracy accuracy) const;
+
+    LayoutMetrics m_metrics;
+    bool m_dirty;
+    QSizeF m_documentSize;
+    QMap<int, QRectF> m_blockRects;
 };
 
 #endif // MARKDOWNLAYOUT_H

@@ -868,10 +868,19 @@ void TextEditor::keyPressEvent(QKeyEvent *event)
             QTextList *textList = cursor.currentList();
             if (textList) {
                 // Remove the list bullet from the current block
-                toggleList();
+                cursor.beginEditBlock();
+                cursor.removeSelectedText();
+                blockFmt.setObjectIndex(-1);
+                blockFmt.setIndent(0);
+                blockFmt.clearProperty(QTextFormat::ListStyle);
+                cursor.endEditBlock();
                 return;
             } else if (blockFmt.hasProperty(QTextFormat::BlockQuoteLevel)) {
-                toggleBlockQuote();
+                cursor.beginEditBlock();
+                cursor.removeSelectedText();
+                blockFmt.clearProperty(QTextFormat::BlockQuoteLevel);
+                cursor.setBlockFormat(blockFmt);
+                cursor.endEditBlock();
                 return;
             }
         }
@@ -1070,7 +1079,7 @@ void TextEditor::insertBlock()
 void TextEditor::copy()
 {
     QMimeData *mimeData = new QMimeData;
-    QTextCursor cursor = QTextCursor();
+    QTextCursor cursor = textCursor();
 
     // Export text as HTML
     QString selectionAsHtml = HtmlExporter::exportDocument(document(), &cursor);

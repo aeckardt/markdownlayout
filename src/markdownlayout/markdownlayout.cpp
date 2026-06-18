@@ -5,6 +5,7 @@
 
 MarkdownLayout::MarkdownLayout(QTextDocument *doc)
     : QAbstractTextDocumentLayout(doc),
+      m_dirty(false),
       m_documentSize(m_metrics.fallbackWidth, 0.0)
 {
 }
@@ -77,6 +78,14 @@ QSizeF MarkdownLayout::documentSize() const
     return m_documentSize;
 }
 
+/*
+ * blockBoundingRect is not the decorated paint rect.
+ * It is the public QTextBlock geometry used by QTextEdit/QWidgetTextControl.
+ *
+ * It must include all QTextLines, but it should also include the layout
+ * origin because QTextLines may be shifted to the right for Markdown
+ * decorations such as list markers or blockquote padding.
+ */
 QRectF MarkdownLayout::blockBoundingRect(const QTextBlock &block) const
 {
     const_cast<MarkdownLayout *>(this)->ensureLayout();
@@ -89,8 +98,18 @@ QRectF MarkdownLayout::blockBoundingRect(const QTextBlock &block) const
         return QRectF();
 
     QRectF rect = layout->boundingRect();
-    rect.moveTopLeft(layout->position());
 
+    // QTextLayout::boundingRect() may start at x > 0 if lines are shifted
+    // via QTextLine::setPosition(lineX, ...). QWidgetTextControl expects
+    // blockBoundingRect().topLeft() to behave like the QTextLayout origin,
+    // but the rect should still contain all lines.
+    if (rect.left() > 0.0)
+        rect.setLeft(0.0);
+
+    if (rect.top() > 0.0)
+        rect.setTop(0.0);
+
+    rect.translate(layout->position());
     return rect;
 }
 
@@ -103,13 +122,18 @@ QRectF MarkdownLayout::frameBoundingRect(QTextFrame *frame) const
 
 void MarkdownLayout::documentChanged(int, int, int)
 {
-    QSizeF oldSize(m_documentSize);
+    const QSizeF oldSize = m_documentSize;
+
     m_dirty = true;
     ensureLayout();
 
     if (m_documentSize != oldSize)
         emit documentSizeChanged(m_documentSize);
-    emit update(QRectF(QPointF(0.0, 0.0), m_documentSize));
+
+    const QRectF oldRect(QPointF(0.0, 0.0), oldSize);
+    const QRectF newRect(QPointF(0.0, 0.0), m_documentSize);
+
+    emit update(oldRect.united(newRect));
 }
 
 void MarkdownLayout::ensureLayout()
