@@ -9,8 +9,7 @@ class LayoutMetrics
 public:
     qreal fallbackWidth = 760.0;
     qreal paragraphSpacing = 4.0;
-    qreal listMarkerWidth = 24.0;
-    qreal listBulletLeftMargin = 6.0;
+    qreal listBulletLeftMargin = 7.0;
     qreal blockPaddingX = 12.0;
     qreal blockPaddingY = 8.0;
     qreal quoteBarWidth = 4.0;
@@ -40,7 +39,7 @@ private:
     qreal bottomPaddingForBlock(const QTextBlock &block) const;
     qreal blockIndent(const QTextBlock &block) const;
 
-    void drawBlockDecoration(QPainter *painter, const PaintContext &context, const QTextBlock &block, QRectF rect);
+    void drawBlock(QPainter *painter, const PaintContext &context, const QTextBlock &block, QRectF rect);
     void drawListItem(QPainter *painter, const PaintContext &context, const QTextBlock &block);
     void drawTextCursorIfNeeded(QPainter *painter, const PaintContext &context, const QTextBlock &block);
 

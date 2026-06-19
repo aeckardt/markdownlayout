@@ -1,7 +1,5 @@
 #include "markdownlayout.h"
 
-#include "texteditor/texteditorstyle.h"
-
 #include <QPainter>
 #include <QTextBlock>
 #include <QTextList>
@@ -29,7 +27,7 @@ void MarkdownLayout::draw(QPainter *painter, const PaintContext &context)
         if (m_blockRects.contains(block.position()))
             rect = m_blockRects[block.position()];
         if (rect.isValid() && rect.intersects(clip)) {
-            drawBlockDecoration(painter, context, block, rect);
+            drawBlock(painter, context, block, rect);
             auto selections = selectionsForBlock(context, block);
             block.layout()->draw(painter, QPointF(0.0, 0.0), selections, clip);
             drawTextCursorIfNeeded(painter, context, block);
@@ -158,17 +156,12 @@ void MarkdownLayout::ensureLayout()
     QTextBlock block = doc->begin();
     while (block.isValid()) {
         QTextBlockFormat blockFmt = block.blockFormat();
-        bool isListItem = block.textList();
         bool isBlockQuote = blockFmt.hasProperty(QTextFormat::BlockQuoteLevel);
-        bool isCodeBlock = blockFmt.hasProperty(QTextFormat::BlockCodeFence);
 
         qreal textX = blockIndent(block);
         qreal availableWidth = docWidth - textX;
 
-        if (isListItem) {
-            textX += m_metrics.listMarkerWidth;
-            availableWidth -= m_metrics.listMarkerWidth;
-        } else if (isBlockQuote || isCodeBlock) {
+        if (isBlockQuote) {
             textX += m_metrics.blockPaddingX;
             availableWidth -= 2.0 * m_metrics.blockPaddingX;
         }
@@ -253,10 +246,8 @@ qreal MarkdownLayout::blockIndent(const QTextBlock &block) const
     int indent = block.blockFormat().indent();
     QTextList *textList = block.textList();
     if (textList)
-        // Default list indent is 1 (at left-most position)
-        // In this layout the normal list indent is replaced by listMarkerWidth
-        // So it should not be below 1
-        indent += textList->format().indent() - 1;
+        // Default list indent is 1
+        indent += textList->format().indent();
 
     if (indent == 0)
         return 0.0;
@@ -267,7 +258,7 @@ qreal MarkdownLayout::blockIndent(const QTextBlock &block) const
 
 // ---- Drawing helpers ----------------------------------------------
 
-void MarkdownLayout::drawBlockDecoration(QPainter *painter, const PaintContext &context, const QTextBlock &block, QRectF rect)
+void MarkdownLayout::drawBlock(QPainter *painter, const PaintContext &context, const QTextBlock &block, QRectF rect)
 {
     QTextBlockFormat blockFmt = block.blockFormat();
     bool isListItem = block.textList();
@@ -291,8 +282,6 @@ void MarkdownLayout::drawBlockDecoration(QPainter *painter, const PaintContext &
 
 void MarkdownLayout::drawListItem(QPainter *painter, const PaintContext &context, const QTextBlock &block)
 {
-    using namespace TextEditorStyle;
-
     const QTextBlockFormat blockFmt = block.blockFormat();
     const QTextCharFormat charFmt = block.charFormat();
     QFont font(charFmt.font());
@@ -320,9 +309,9 @@ void MarkdownLayout::drawListItem(QPainter *painter, const PaintContext &context
 
     QSizeF size;
     switch (style) {
-    case ListStyle::Disc:
-    case ListStyle::Circle:
-    case ListStyle::Dash:
+    case QTextListFormat::ListDisc:
+    case QTextListFormat::ListCircle:
+    case QTextListFormat::ListSquare:
         size.setWidth(fontMetrics.lineSpacing() / 3);
         size.setHeight(size.width());
         break;
@@ -332,8 +321,8 @@ void MarkdownLayout::drawListItem(QPainter *painter, const PaintContext &context
     }
 
     QRectF rct(pos, size);
-    rct.translate(-m_metrics.listMarkerWidth + m_metrics.listBulletLeftMargin,
-                (fontMetrics.height() / 2) - (size.height() / 2));
+    rct.translate(-document()->indentWidth() + m_metrics.listBulletLeftMargin,
+                  (fontMetrics.height() / 2) - (size.height() / 2));
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
@@ -341,14 +330,14 @@ void MarkdownLayout::drawListItem(QPainter *painter, const PaintContext &context
     QBrush brush = context.palette.brush(QPalette::Text);
 
     switch (style) {
-    case ListStyle::Dash:
+    case QTextListFormat::ListSquare:
         painter->fillRect(rct, brush);
         break;
-    case ListStyle::Circle:
+    case QTextListFormat::ListCircle:
         painter->setPen(QPen(brush, 0));
         painter->drawEllipse(rct.translated(0.5, 0.5)); // pixel align for sharper rendering
         break;
-    case ListStyle::Disc:
+    case QTextListFormat::ListDisc:
         painter->setBrush(brush);
         painter->setPen(Qt::NoPen);
         painter->drawEllipse(rct);
