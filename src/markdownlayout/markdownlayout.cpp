@@ -132,6 +132,7 @@ void MarkdownLayout::documentChanged(int, int, int)
     if (m_documentSize != oldSize)
         emit documentSizeChanged(m_documentSize);
 
+    // Make sure deleted content is cleared
     const QRectF oldRect(QPointF(0.0, 0.0), oldSize);
     const QRectF newRect(QPointF(0.0, 0.0), m_documentSize);
 
@@ -158,6 +159,8 @@ void MarkdownLayout::ensureLayout()
         QTextBlockFormat blockFmt = block.blockFormat();
         bool isBlockQuote = blockFmt.hasProperty(QTextFormat::BlockQuoteLevel);
 
+        // QTextLine positions carry the visual indentation.
+        // The list marker is painted later into the indentation area by drawListItem().
         qreal textX = blockIndent(block);
         qreal availableWidth = docWidth - textX;
 
@@ -240,19 +243,25 @@ qreal MarkdownLayout::bottomPaddingForBlock(const QTextBlock &block) const
     return 0.0;
 }
 
+/*
+ * Match Qt's internal indent model: the visual x-offset is the
+ * sum of the block indent and the QTextListFormat indent, multiplied by
+ * document()->indentWidth().
+ *
+ * List nesting is stored per block via QTextBlockFormat::indent().
+ * QTextListFormat::indent() remains the list-wide base indent; normally it is 1
+ * for top-level lists.
+ */
 qreal MarkdownLayout::blockIndent(const QTextBlock &block) const
 {
-    // Add block and list indent
     int indent = block.blockFormat().indent();
     QTextList *textList = block.textList();
     if (textList)
-        // Default list indent is 1
         indent += textList->format().indent();
 
     if (indent == 0)
         return 0.0;
 
-    // Multiply with document indent width
     return qreal(indent) * document()->indentWidth();
 }
 
@@ -291,6 +300,8 @@ void MarkdownLayout::drawListItem(QPainter *painter, const PaintContext &context
     QTextList *textList = block.textList();
     Q_ASSERT(textList);
 
+    // The list object provides the default QTextListFormat::style(), but Qt also
+    // supports a per-item override via QTextBlockFormat::ListStyle.
     QTextListFormat listFmt = textList->format();
     int style = listFmt.style();
     if (blockFmt.hasProperty(QTextFormat::ListStyle))
@@ -320,6 +331,8 @@ void MarkdownLayout::drawListItem(QPainter *painter, const PaintContext &context
         return;
     }
 
+    // The text line starts at the indented text position. Move back by one document
+    // indent width to paint the marker inside the indentation area.
     QRectF rct(pos, size);
     rct.translate(-document()->indentWidth() + m_metrics.listBulletLeftMargin,
                   (fontMetrics.height() / 2) - (size.height() / 2));
@@ -335,7 +348,7 @@ void MarkdownLayout::drawListItem(QPainter *painter, const PaintContext &context
         break;
     case QTextListFormat::ListCircle:
         painter->setPen(QPen(brush, 0));
-        painter->drawEllipse(rct.translated(0.5, 0.5)); // pixel align for sharper rendering
+        painter->drawEllipse(rct.translated(0.5, 0.5));  // pixel align for sharper rendering
         break;
     case QTextListFormat::ListDisc:
         painter->setBrush(brush);
@@ -358,17 +371,17 @@ void MarkdownLayout::drawTextCursorIfNeeded(QPainter *painter, const PaintContex
         return;
 
     int blockStart = block.position();
-    int blockEnd = blockStart + block.length() - 1;
-    if (blockStart > cursorPos || cursorPos > blockEnd)
+    int blockEnd = blockStart + block.length();
+    if (cursorPos < blockStart || cursorPos >= blockEnd)
         return;
 
     QTextLayout *layout = block.layout();
-    int localPos = std::max(0, std::min(cursorPos - blockStart, (int)block.text().length()));
+    int localPos = cursorPos - blockStart;  // cursor position within block
 
     painter->save();
     painter->setPen(QPen(context.palette.text().color()));
     if (layout->lineCount() > 0)
-        layout->drawCursor(painter, QPointF(0.0, 0.0), localPos, 1);
+        layout->drawCursor(painter, QPointF(), localPos);
     else {
         QFontMetricsF fm = QFontMetricsF(document()->defaultFont());
         qreal x = layout->position().x();

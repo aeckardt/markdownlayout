@@ -30,6 +30,8 @@ public:
     // Import document
     void setDocument(QTextDocument *document);
 
+    // Markdown-level block model. These are treated as exclusive block types,
+    // not as freely composable QTextBlockFormat features.
     enum BlockType : int {
         Paragraph       = 0,
         Heading1        = 10,
@@ -44,7 +46,7 @@ public:
     BlockType blockType(const QTextBlock &block) const;
     static int headingLevel(BlockType type);
 
-    // Copy content as markdown to clipboard
+    // Copy content as Markdown to clipboard
     void copyAsMarkdown();
 
     // Working directory for opening files
@@ -103,6 +105,7 @@ private:
     void mergeFormatOnSelection(const QTextCharFormat &format, bool selectWord = false);
 
     // BlockFormat manipulation
+
     enum ScopePolicy {
         CurrentBlock,
         SelectedBlocks

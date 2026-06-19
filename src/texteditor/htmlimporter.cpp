@@ -526,9 +526,6 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
         else
             m_blockFmt.setProperty(QTextFormat::ListStyle, TopLevelListStyle);
 
-        // Add item to list
-        m_currentList->add(m_cursor->block());
-
         // Activate safety guard for not adding a newline with a paragraph directly after
         m_newListItem = true;
     } else if (tag == QStringLiteral("h1") || tag == QStringLiteral("h2") ||

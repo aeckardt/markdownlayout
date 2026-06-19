@@ -3,6 +3,8 @@
 
 #include <algorithm>
 
+using namespace TextEditorStyle;
+
 InlineFormatResolver::InlineFormatResolver(const QTextBlock &block, int start, int end)
     : m_block(block), m_start(start), m_end(end), m_useRange(start != -1 && end != -1), m_firstIndex(-1), m_lastIndex(-1)
 {
@@ -113,7 +115,7 @@ void InlineFormatResolver::detectFormatChanges()
 
     while (!it.atEnd()) {
         // Char format from previous fragment
-        const QTextCharFormat prevFmt = previous.isValid() ? previous.charFormat() : TextEditorStyle::defaultCharFormat();
+        const QTextCharFormat prevFmt = previous.isValid() ? previous.charFormat() : defaultCharFormat();
 
         // Char format from current fragment
         const QTextFragment fragment = it.fragment();
@@ -123,7 +125,7 @@ void InlineFormatResolver::detectFormatChanges()
 
         // Char format from next fragment
         ++it;
-        QTextCharFormat nextFmt = TextEditorStyle::defaultCharFormat();
+        QTextCharFormat nextFmt = defaultCharFormat();
         if (!it.atEnd()) {
             const QTextFragment nextFragment = it.fragment();
             if (nextFragment.isValid())
@@ -147,13 +149,13 @@ void InlineFormatResolver::detectFormatChanges()
 
         // Detect all format changes
         // Handle opening tags
-        if (!TextEditorStyle::isMarkdownStrong(prevFmt) && TextEditorStyle::isMarkdownStrong(curFmt))
+        if (!isMarkdownStrong(prevFmt) && isMarkdownStrong(curFmt))
             m_formats.append({InlineFormat::Type::Bold, index});
         if (!prevFmt.fontItalic() && curFmt.fontItalic())
             m_formats.append({InlineFormat::Type::Italic, index});
         if (!prevFmt.fontUnderline() && curFmt.fontUnderline())
             m_formats.append({InlineFormat::Type::Underline, index});
-        if (prevFmt.fontPointSize() != curFmt.fontPointSize() && curFmt.fontPointSize() != TextEditorStyle::defaultFontPointSize())
+        if (prevFmt.fontPointSize() != curFmt.fontPointSize() && curFmt.fontPointSize() != defaultFontPointSize())
             m_formats.append({InlineFormat::Type::PointSize, index, -1, {{QStringLiteral("font-size"), QString::number(int(curFmt.fontPointSize()))}}});
         if (!prevFmt.isAnchor() && curFmt.isAnchor())
             m_formats.append({InlineFormat::Type::Link, index, -1, {{QStringLiteral("href"), curFmt.anchorHref()}}});
@@ -167,13 +169,13 @@ void InlineFormatResolver::detectFormatChanges()
                 m_formats[i].end = index;
         };
 
-        if (TextEditorStyle::isMarkdownStrong(curFmt) && !TextEditorStyle::isMarkdownStrong(nextFmt))
+        if (isMarkdownStrong(curFmt) && !isMarkdownStrong(nextFmt))
             closeLast(InlineFormat::Type::Bold);
         if (curFmt.fontItalic() && !nextFmt.fontItalic())
             closeLast(InlineFormat::Type::Italic);
         if (curFmt.fontUnderline() && !nextFmt.fontUnderline())
             closeLast(InlineFormat::Type::Underline);
-        if (curFmt.fontPointSize() != nextFmt.fontPointSize() && curFmt.fontPointSize() != TextEditorStyle::defaultFontPointSize())
+        if (curFmt.fontPointSize() != nextFmt.fontPointSize() && curFmt.fontPointSize() != defaultFontPointSize())
             closeLast(InlineFormat::Type::PointSize);
         if (curFmt.isAnchor() && !nextFmt.isAnchor())
             closeLast(InlineFormat::Type::Link);

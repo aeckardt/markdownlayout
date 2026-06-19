@@ -460,7 +460,7 @@ void TextEditor::setHeadingCharFormat(const QTextBlock &block, int headingLevel)
     auto headingFormatModifier = [&](const QTextBlock &, QTextCharFormat charFmt) {
         // Set / remove heading-specific visual formatting
         // depending on headingLevel (0 -> no heading)
-        bool isStrong = isMarkdownStrong(charFmt);
+        const bool isStrong = isMarkdownStrong(charFmt);
         if (headingLevel > 0) {
             charFmt.setFontWeight(
                         isStrong
@@ -610,7 +610,8 @@ void TextEditor::setBlockTypeForBlock(const QTextBlock &block, BlockType type, b
     if (oldLevel > 0 && level == 0)
         clearHeadingCharFormat(block);
 
-    // Set new format
+    // Start from the default block format so switching a new block type clears old
+    // block metadata such as list object index, quote level, or horizontal rule.
     QTextBlockFormat blockFmt(defaultBlockFormat());
     switch (type) {
     case BlockType::Heading1:
@@ -687,10 +688,11 @@ void TextEditor::adjustListIndentationForBlock(const QTextBlock &block, int delt
     if (currentIndent == newIndent)
         return;
 
+    // Nesting is stored per list item as QTextBlockFormat::indent().
     blockFmt.setIndent(newIndent);
 
     // Setting the ListStyle property for QTextBlockFormat
-    // overrides the TextListFormat ListStyle
+    // overrides the QTextListFormat::Style
     blockFmt.setProperty(QTextFormat::ListStyle, newIndent > 0
                          ? LowerLevelListStyle
                          : TopLevelListStyle);
@@ -744,7 +746,7 @@ void TextEditor::insertBlock()
     int posInBlock = cursor.positionInBlock();
 
     cursor.beginEditBlock();
-    if (posInBlock == 0) {
+    if (posInBlock == 0 && cursor.selectionStart() == cursor.selectionEnd()) {
         cursor.setCharFormat(defaultCharFormat());
 
         // The cursor is at the beginning of the line

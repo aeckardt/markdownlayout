@@ -125,13 +125,15 @@ void MarkdownRenderer::renderBlocks(const QVector<MarkdownBlockToken> &tokens)
                     m_currentList = m_cursor->createList(TopLevelListStyle);
             }
 
+            // List items share a QTextList object where possible.
+            // The visual nesting level is stored per block via QTextBlockFormat::indent(),
+            // and the bullet shape is stored as a per-block ListStyle override.
             m_blockFmt.setObjectIndex(m_currentList->objectIndex());
             m_blockFmt.setIndent(token.level);
             m_blockFmt.setProperty(QTextFormat::ListStyle,
                                    token.level > 0
                                    ? LowerLevelListStyle
                                    : TopLevelListStyle);
-            m_currentList->add(m_cursor->block());
 
             break;
         case TokenType::BlockQuote:
