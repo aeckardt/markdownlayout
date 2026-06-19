@@ -455,32 +455,33 @@ void TextEditor::clearStrongOnSelection()
     applyFragmentChangesToSelection(clearStrongModifier);
 }
 
-QTextCharFormat TextEditor::headingCharFormat(int headingLevel, QTextCharFormat charFmt)
+void TextEditor::setHeadingCharFormat(const QTextBlock &block, int headingLevel)
 {
-    // Set / remove heading-specific visual formatting
-    // depending on headingLevel (0 -> no heading)
-    bool isStrong = isMarkdownStrong(charFmt);
-    if (headingLevel > 0) {
-        charFmt.setFontWeight(
-                    isStrong
-                    ? StrongFontWeight
-                    : HeadingFontWeight);
-        charFmt.setProperty(QTextCharFormat::Property::FontSizeAdjustment, 4 - headingLevel);
-    } else {
-        charFmt.setFontWeight(
-                    isStrong
-                    ? StrongFontWeight
-                    : NormalFontWeight);
-        charFmt.clearProperty(QTextCharFormat::Property::FontSizeAdjustment);
-    }
-    return charFmt;
-}
+    auto headingFormatModifier = [&](const QTextBlock &, QTextCharFormat charFmt) {
+        // Set / remove heading-specific visual formatting
+        // depending on headingLevel (0 -> no heading)
+        bool isStrong = isMarkdownStrong(charFmt);
+        if (headingLevel > 0) {
+            charFmt.setFontWeight(
+                        isStrong
+                        ? StrongFontWeight
+                        : HeadingFontWeight);
+            charFmt.setProperty(QTextCharFormat::Property::FontSizeAdjustment, 4 - headingLevel);
+        } else {
+            charFmt.setFontWeight(
+                        isStrong
+                        ? StrongFontWeight
+                        : NormalFontWeight);
+            charFmt.clearProperty(QTextCharFormat::Property::FontSizeAdjustment);
+        }
+        return charFmt;
+    };
 
-void TextEditor::applyHeadingCharFormatToBlock(const QTextBlock &block, int headingLevel)
-{
-    applyFragmentChangesToBlock(block, [&](const QTextBlock &, QTextCharFormat charFmt) {
-        return headingCharFormat(headingLevel, charFmt);
-    });
+    QTextCursor cursor(block);
+    cursor.beginEditBlock();
+    applyFragmentChangesToBlock(block, headingFormatModifier);
+    cursor.setBlockCharFormat(headingFormatModifier(block, defaultCharFormat()));
+    cursor.endEditBlock();
 }
 
 void TextEditor::applyFragmentChangesToSelection(const FormatModifier &modifier)
@@ -593,79 +594,40 @@ void TextEditor::setBlockType(BlockType type, ScopePolicy policy, bool toggle)
 
 void TextEditor::setBlockTypeForBlock(const QTextBlock &block, BlockType type, bool toggle)
 {
-    BlockType typeBefore = blockType(block);
-    if (typeBefore == type) {
+    BlockType oldType = blockType(block);
+    if (oldType == type) {
         if (toggle)
             setBlockTypeForBlock(block, BlockType::Paragraph);
         return;
     }
 
-    // Clear old format
-    QTextBlockFormat blockFmt = block.blockFormat();
-    switch (typeBefore) {
-    case BlockType::Heading1:
-    case BlockType::Heading2:
-    case BlockType::Heading3:
-    case BlockType::Heading4:
-        blockFmt.setHeadingLevel(0);
-        clearHeadingCharFormat(block);
-        break;
-    case BlockType::TextList: {
-        QTextList *textList = block.textList();
-        if (textList)
-            textList->remove(block);
-        else
-            qWarning() << QStringLiteral("No textList object available in block with type TextList");
-
-        blockFmt.setObjectIndex(-1);
-        blockFmt.setIndent(0);
-        blockFmt.clearProperty(QTextFormat::ListStyle);
-
-        break;
-    }
-    case BlockType::BlockQuote:
-        blockFmt.clearProperty(QTextFormat::BlockQuoteLevel);
-        break;
-    case BlockType::HorizontalRuler:
-        blockFmt.clearProperty(QTextFormat::BlockTrailingHorizontalRulerWidth);
-#ifdef HORIZONTAL_RULER_COLOR
-        blockFmt.clearProperty(QTextFormat::BackgroundBrush);
-#endif
-        break;
-    default:
-        // Nothing to do for paragraph
-        ;
-    }
-
-    // Set new format
     QTextCursor localCursor(block);
     localCursor.beginEditBlock();
 
+    // Clear old heading format, if necessary
+    int oldLevel = headingLevel(oldType);
+    int level = headingLevel(type);
+    if (oldLevel > 0 && level == 0)
+        clearHeadingCharFormat(block);
+
+    // Set new format
+    QTextBlockFormat blockFmt(defaultBlockFormat());
     switch (type) {
     case BlockType::Heading1:
     case BlockType::Heading2:
     case BlockType::Heading3:
     case BlockType::Heading4: {
-        int headingLevel = (int)type - (int)BlockType::Heading1 + 1;
-        blockFmt.setHeadingLevel(headingLevel);
-        if (block.length() > 0)
-            applyHeadingCharFormatToBlock(block, headingLevel);
-        // TODO: Set cursor char format for heading (especially if nothing is selected)
-//        if (block == textCursor().block()) {
-//            QTextCharFormat charFmt = headingCharFormat(headingLevel);
-//            mergeFormatOnSelection(charFmt);
-//        }
+        setHeadingCharFormat(block, level);
+        blockFmt.setHeadingLevel(level);
         break;
     }
     case BlockType::TextList: {
         // Setup new list
         QTextListFormat listFmt;
-        QTextListFormat::Style listStyle = TopLevelListStyle;
         listFmt.setIndent(1);
-        listFmt.setProperty(QTextFormat::ListStyle, listStyle);
+        listFmt.setProperty(QTextFormat::ListStyle, TopLevelListStyle);
 
         QTextList *textList = localCursor.createList(listFmt);
-
         blockFmt.setObjectIndex(textList->objectIndex());
         break;
     }
@@ -673,7 +635,7 @@ void TextEditor::setBlockTypeForBlock(const QTextBlock &block, BlockType type, b
         blockFmt.setProperty(QTextFormat::BlockQuoteLevel, 1);
         break;
     case BlockType::HorizontalRuler:
-        // Remove line
+        // Remove text in line before making horizontal ruler
         localCursor.select(QTextCursor::LineUnderCursor);
         localCursor.removeSelectedText();
 
@@ -696,17 +658,19 @@ void TextEditor::setBlockTypeForBlock(const QTextBlock &block, BlockType type, b
 
 void TextEditor::setListStyle(QTextCursor &cursor, QTextListFormat::Style style)
 {
-    // Check if styles are different
-    QTextBlockFormat blockFmt = cursor.blockFormat();
-    QTextListFormat::Style oldStyle = static_cast<QTextListFormat::Style>(
-                blockFmt.property(QTextFormat::ListStyle).toInt());
+    QTextList *textList = cursor.block().textList();
+    if (!textList)
+        return;
 
-    if (style == oldStyle)
+    QTextListFormat listFmt = textList->format();
+
+    // Check if styles are different
+    if (style == listFmt.style())
         return;
 
     // Change list style
-    blockFmt.setProperty(QTextFormat::ListStyle, style);
-    cursor.setBlockFormat(blockFmt);
+    listFmt.setStyle(style);
+    textList->setFormat(listFmt);
 }
 
 /*

@@ -83,10 +83,9 @@ private slots:
 private:
     void clearStrongOnSelection();
 
-    static QTextCharFormat headingCharFormat(int headingLevel, QTextCharFormat charFmt = QTextCharFormat());
-    void applyHeadingCharFormatToBlock(const QTextBlock &block, int headingLevel);
+    void setHeadingCharFormat(const QTextBlock &block, int headingLevel);
     void clearHeadingCharFormat(const QTextBlock &block)
-    { applyHeadingCharFormatToBlock(block, 0); }
+    { setHeadingCharFormat(block, 0); }
 
     typedef std::function<QTextCharFormat(const QTextBlock &, QTextCharFormat)> FormatModifier;
     struct CharFormatUpdate {
