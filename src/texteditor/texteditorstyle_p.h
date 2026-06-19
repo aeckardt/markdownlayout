@@ -7,7 +7,7 @@
 #define LINK_COLOR   "#1c37e5"
 
 // Optional TextEditor styles (remove to deactivate)
-#define DOCUMENT_INDENT_WIDTH  30
+#define DOCUMENT_INDENT_WIDTH  25
 #define VIEWPORT_MARGIN        15
 
 #define BLOCK_LINE_HEIGHT      "125%"

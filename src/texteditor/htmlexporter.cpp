@@ -72,7 +72,6 @@ QString HtmlExporter::exportBlock(const QTextBlock &block)
     const auto fragments = InlineFormatResolver(block, m_start, m_end).fragments();
 
     // Process each fragment in the block
-    bool atBlockBegin = true;
     for (const auto &ef : fragments) {
         const auto fragment = ef.fragment;
         if (!fragment.isValid())
@@ -101,8 +100,6 @@ QString HtmlExporter::exportBlock(const QTextBlock &block)
 
         if (remaining <= 0)
             break;
-
-        atBlockBegin = false;
     }
 
     // Close the block's formatting

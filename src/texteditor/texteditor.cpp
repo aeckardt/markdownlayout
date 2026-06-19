@@ -623,11 +623,7 @@ void TextEditor::setBlockTypeForBlock(const QTextBlock &block, BlockType type, b
     }
     case BlockType::TextList: {
         // Setup new list
-        QTextListFormat listFmt;
-        listFmt.setIndent(1);
-        listFmt.setProperty(QTextFormat::ListStyle, TopLevelListStyle);
-
-        QTextList *textList = localCursor.createList(listFmt);
+        QTextList *textList = localCursor.createList(TopLevelListStyle);
         blockFmt.setObjectIndex(textList->objectIndex());
         break;
     }
@@ -654,23 +650,6 @@ void TextEditor::setBlockTypeForBlock(const QTextBlock &block, BlockType type, b
     localCursor.endEditBlock();
 
     emit blockFormatChanged(block);
-}
-
-void TextEditor::setListStyle(QTextCursor &cursor, QTextListFormat::Style style)
-{
-    QTextList *textList = cursor.block().textList();
-    if (!textList)
-        return;
-
-    QTextListFormat listFmt = textList->format();
-
-    // Check if styles are different
-    if (style == listFmt.style())
-        return;
-
-    // Change list style
-    listFmt.setStyle(style);
-    textList->setFormat(listFmt);
 }
 
 /*
@@ -710,13 +689,14 @@ void TextEditor::adjustListIndentationForBlock(const QTextBlock &block, int delt
 
     blockFmt.setIndent(newIndent);
 
+    // Setting the ListStyle property for QTextBlockFormat
+    // overrides the TextListFormat ListStyle
+    blockFmt.setProperty(QTextFormat::ListStyle, newIndent > 0
+                         ? LowerLevelListStyle
+                         : TopLevelListStyle);
+
     QTextCursor blockCursor(block);
     blockCursor.setBlockFormat(blockFmt);
-
-    if (newIndent > 0)
-        setListStyle(blockCursor, LowerLevelListStyle);
-    else
-        setListStyle(blockCursor, TopLevelListStyle);
 
     emit blockFormatChanged(block);
 }

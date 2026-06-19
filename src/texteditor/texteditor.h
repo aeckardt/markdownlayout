@@ -126,8 +126,6 @@ private:
     void removeBlockStyle()
     { setBlockType(Paragraph, SelectedBlocks); }
 
-    void setListStyle(QTextCursor &cursor, QTextListFormat::Style style);
-
     void indentSelection() { adjustListIndentation(1); }
     void unindentSelection() { adjustListIndentation(-1); }
     void adjustListIndentation(int delta);

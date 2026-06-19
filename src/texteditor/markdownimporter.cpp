@@ -121,13 +121,16 @@ void MarkdownRenderer::renderBlocks(const QVector<MarkdownBlockToken> &tokens)
                 if (m_cursor->currentList())
                     m_currentList = m_cursor->currentList();
                 else
-                    m_currentList = m_cursor->createList(QTextListFormat::ListDisc);
+                    // Set default list style
+                    m_currentList = m_cursor->createList(TopLevelListStyle);
             }
 
             m_blockFmt.setObjectIndex(m_currentList->objectIndex());
             m_blockFmt.setIndent(token.level);
             m_blockFmt.setProperty(QTextFormat::ListStyle,
-                                      token.level > 0 ? LowerLevelListStyle : TopLevelListStyle);
+                                   token.level > 0
+                                   ? LowerLevelListStyle
+                                   : TopLevelListStyle);
             m_currentList->add(m_cursor->block());
 
             break;

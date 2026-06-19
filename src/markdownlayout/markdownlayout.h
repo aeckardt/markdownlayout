@@ -8,8 +8,9 @@ class LayoutMetrics
 {
 public:
     qreal fallbackWidth = 760.0;
-    float paragraphSpacing = 4.0;
+    qreal paragraphSpacing = 4.0;
     qreal listMarkerWidth = 24.0;
+    qreal listBulletLeftMargin = 6.0;
     qreal blockPaddingX = 12.0;
     qreal blockPaddingY = 8.0;
     qreal quoteBarWidth = 4.0;
@@ -35,15 +36,16 @@ private:
     void ensureLayout();
     qreal layoutBlockText(QTextLayout *layout, qreal lineX, qreal lineWidth) const;
     qreal documentWidth() const;
-    qreal topPaddingForBlock(QTextBlock block) const;
-    qreal bottomPaddingForBlock(QTextBlock block) const;
+    qreal topPaddingForBlock(const QTextBlock &block) const;
+    qreal bottomPaddingForBlock(const QTextBlock &block) const;
+    qreal blockIndent(const QTextBlock &block) const;
 
-    void drawBlockDecoration(QPainter *painter, QTextBlock block, QRectF rect);
-    void drawMarkdownListMarker(QPainter *painter, QTextBlock block);
-    void drawTextCursorIfNeeded(QPainter *painter, const PaintContext &context, QTextBlock block);
+    void drawBlockDecoration(QPainter *painter, const PaintContext &context, const QTextBlock &block, QRectF rect);
+    void drawListItem(QPainter *painter, const PaintContext &context, const QTextBlock &block);
+    void drawTextCursorIfNeeded(QPainter *painter, const PaintContext &context, const QTextBlock &block);
 
-    QList<QTextLayout::FormatRange> selectionsForBlock(const PaintContext &context, QTextBlock block) const;
-    int hitTestBlock(QTextBlock block, QPointF point, Qt::HitTestAccuracy accuracy) const;
+    QList<QTextLayout::FormatRange> selectionsForBlock(const PaintContext &context, const QTextBlock &block) const;
+    int hitTestBlock(const QTextBlock &block, QPointF point, Qt::HitTestAccuracy accuracy) const;
 
     LayoutMetrics m_metrics;
     bool m_dirty;

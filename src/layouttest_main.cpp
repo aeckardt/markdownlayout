@@ -48,8 +48,6 @@ private:
     TextEditorWidget *m_textEdit;
 };
 
-#include <QTextBlock>
-
 int main(int argc, char **argv)
 {
     QApplication app(argc, argv);

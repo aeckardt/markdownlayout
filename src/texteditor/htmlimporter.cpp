@@ -522,9 +522,9 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
 
         // Set list style dependent on indent
         if (m_nestedUlTags > 1)
-            m_blockFmt.setProperty(QTextFormat::Property::ListStyle, LowerLevelListStyle);
+            m_blockFmt.setProperty(QTextFormat::ListStyle, LowerLevelListStyle);
         else
-            m_blockFmt.setProperty(QTextFormat::Property::ListStyle, TopLevelListStyle);
+            m_blockFmt.setProperty(QTextFormat::ListStyle, TopLevelListStyle);
 
         // Add item to list
         m_currentList->add(m_cursor->block());

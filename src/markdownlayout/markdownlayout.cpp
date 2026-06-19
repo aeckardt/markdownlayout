@@ -1,7 +1,11 @@
 #include "markdownlayout.h"
 
+#include "texteditor/texteditorstyle.h"
+
 #include <QPainter>
 #include <QTextBlock>
+#include <QTextList>
+#include <QTextListFormat>
 
 MarkdownLayout::MarkdownLayout(QTextDocument *doc)
     : QAbstractTextDocumentLayout(doc),
@@ -25,7 +29,7 @@ void MarkdownLayout::draw(QPainter *painter, const PaintContext &context)
         if (m_blockRects.contains(block.position()))
             rect = m_blockRects[block.position()];
         if (rect.isValid() && rect.intersects(clip)) {
-            drawBlockDecoration(painter, block, rect);
+            drawBlockDecoration(painter, context, block, rect);
             auto selections = selectionsForBlock(context, block);
             block.layout()->draw(painter, QPointF(0.0, 0.0), selections, clip);
             drawTextCursorIfNeeded(painter, context, block);
@@ -158,20 +162,18 @@ void MarkdownLayout::ensureLayout()
         bool isBlockQuote = blockFmt.hasProperty(QTextFormat::BlockQuoteLevel);
         bool isCodeBlock = blockFmt.hasProperty(QTextFormat::BlockCodeFence);
 
-        float textX = 0.0;
-        float availableWidth = docWidth;
+        qreal textX = blockIndent(block);
+        qreal availableWidth = docWidth - textX;
 
         if (isListItem) {
             textX += m_metrics.listMarkerWidth;
             availableWidth -= m_metrics.listMarkerWidth;
-        }
-
-        if (isBlockQuote || isCodeBlock) {
+        } else if (isBlockQuote || isCodeBlock) {
             textX += m_metrics.blockPaddingX;
             availableWidth -= 2.0 * m_metrics.blockPaddingX;
         }
 
-        availableWidth = std::max((float)80.0, availableWidth);
+        availableWidth = std::max((qreal)80.0, availableWidth);
 
         QTextLayout *layout = block.layout();
         layout->clearLayout();
@@ -179,11 +181,11 @@ void MarkdownLayout::ensureLayout()
         layout->setTextOption(option);
         layout->setPosition(QPointF(0.0, y + topPaddingForBlock(block)));
 
-        float textHeight = layoutBlockText(layout, textX, availableWidth);
+        qreal textHeight = layoutBlockText(layout, textX, availableWidth);
         if (textHeight <= 0.0)
             textHeight = QFontMetrics(doc->defaultFont()).height();
 
-        float blockHeight =
+        qreal blockHeight =
                 topPaddingForBlock(block) +
                 textHeight +
                 bottomPaddingForBlock(block);
@@ -227,7 +229,7 @@ qreal MarkdownLayout::documentWidth() const
     return m_metrics.fallbackWidth;
 }
 
-qreal MarkdownLayout::topPaddingForBlock(QTextBlock block) const
+qreal MarkdownLayout::topPaddingForBlock(const QTextBlock &block) const
 {
     QTextBlockFormat blockFmt = block.blockFormat();
     if (blockFmt.hasProperty(QTextFormat::BlockQuoteLevel)
@@ -236,18 +238,36 @@ qreal MarkdownLayout::topPaddingForBlock(QTextBlock block) const
     return 0.0;
 }
 
-qreal MarkdownLayout::bottomPaddingForBlock(QTextBlock block) const
+qreal MarkdownLayout::bottomPaddingForBlock(const QTextBlock &block) const
 {
     QTextBlockFormat blockFmt = block.blockFormat();
     if (blockFmt.hasProperty(QTextFormat::BlockQuoteLevel)
             || blockFmt.hasProperty(QTextFormat::BlockCodeFence))
         return m_metrics.blockPaddingY;
     return 0.0;
+}
+
+qreal MarkdownLayout::blockIndent(const QTextBlock &block) const
+{
+    // Add block and list indent
+    int indent = block.blockFormat().indent();
+    QTextList *textList = block.textList();
+    if (textList)
+        // Default list indent is 1 (at left-most position)
+        // In this layout the normal list indent is replaced by listMarkerWidth
+        // So it should not be below 1
+        indent += textList->format().indent() - 1;
+
+    if (indent == 0)
+        return 0.0;
+
+    // Multiply with document indent width
+    return qreal(indent) * document()->indentWidth();
 }
 
 // ---- Drawing helpers ----------------------------------------------
 
-void MarkdownLayout::drawBlockDecoration(QPainter *painter, QTextBlock block, QRectF rect)
+void MarkdownLayout::drawBlockDecoration(QPainter *painter, const PaintContext &context, const QTextBlock &block, QRectF rect)
 {
     QTextBlockFormat blockFmt = block.blockFormat();
     bool isListItem = block.textList();
@@ -255,7 +275,7 @@ void MarkdownLayout::drawBlockDecoration(QPainter *painter, QTextBlock block, QR
     bool isCodeBlock = blockFmt.hasProperty(QTextFormat::BlockCodeFence);
 
     if (isListItem)
-        drawMarkdownListMarker(painter, block);
+        drawListItem(painter, context, block);
     else if (isBlockQuote) {
         painter->fillRect(rect, QColor("#f6f8fa"));
         QRectF bar = QRectF(
@@ -269,24 +289,80 @@ void MarkdownLayout::drawBlockDecoration(QPainter *painter, QTextBlock block, QR
         painter->fillRect(rect, QColor("#f6f8fa"));
 }
 
-void MarkdownLayout::drawMarkdownListMarker(QPainter *painter, QTextBlock block)
+void MarkdownLayout::drawListItem(QPainter *painter, const PaintContext &context, const QTextBlock &block)
 {
-    const QTextLayout *layout = block.layout();
+    using namespace TextEditorStyle;
+
+    const QTextBlockFormat blockFmt = block.blockFormat();
+    const QTextCharFormat charFmt = block.charFormat();
+    QFont font(charFmt.font());
+    const QFontMetrics fontMetrics(font);
+
+    // A list should be available in this method
+    QTextList *textList = block.textList();
+    Q_ASSERT(textList);
+
+    QTextListFormat listFmt = textList->format();
+    int style = listFmt.style();
+    if (blockFmt.hasProperty(QTextFormat::ListStyle))
+        style = QTextListFormat::Style(blockFmt.intProperty(QTextFormat::ListStyle));
+
+    QTextLayout *layout = block.layout();
     if (layout->lineCount() == 0)
         return;
 
     QTextLine firstLine = layout->lineAt(0);
-    qreal baselineY = layout->position().y() + firstLine.y() + firstLine.ascent();
-    qreal markerX = layout->position().x() + firstLine.x() - m_metrics.listMarkerWidth + 6.0;
+    Q_ASSERT(firstLine.isValid());
+
+    QPointF pos = layout->position();
+    QRectF textRect = firstLine.naturalTextRect();
+    pos += textRect.topLeft().toPoint();
+
+    QSizeF size;
+    switch (style) {
+    case ListStyle::Disc:
+    case ListStyle::Circle:
+    case ListStyle::Dash:
+        size.setWidth(fontMetrics.lineSpacing() / 3);
+        size.setHeight(size.width());
+        break;
+
+    default:
+        return;
+    }
+
+    QRectF rct(pos, size);
+    rct.translate(-m_metrics.listMarkerWidth + m_metrics.listBulletLeftMargin,
+                (fontMetrics.height() / 2) - (size.height() / 2));
 
     painter->save();
-    painter->setPen(QPen(QColor("#57606a")));
-    painter->setFont(document()->defaultFont());
-    painter->drawText(QPointF(markerX, baselineY), "-");
+    painter->setRenderHint(QPainter::Antialiasing);
+
+    QBrush brush = context.palette.brush(QPalette::Text);
+
+    switch (style) {
+    case ListStyle::Dash:
+        painter->fillRect(rct, brush);
+        break;
+    case ListStyle::Circle:
+        painter->setPen(QPen(brush, 0));
+        painter->drawEllipse(rct.translated(0.5, 0.5)); // pixel align for sharper rendering
+        break;
+    case ListStyle::Disc:
+        painter->setBrush(brush);
+        painter->setPen(Qt::NoPen);
+        painter->drawEllipse(rct);
+        break;
+    case QTextListFormat::ListStyleUndefined:
+        break;
+    default:
+        break;
+    }
+
     painter->restore();
 }
 
-void MarkdownLayout::drawTextCursorIfNeeded(QPainter *painter, const PaintContext &context, QTextBlock block)
+void MarkdownLayout::drawTextCursorIfNeeded(QPainter *painter, const PaintContext &context, const QTextBlock &block)
 {
     int cursorPos = context.cursorPosition;
     if (cursorPos < 0)
@@ -315,7 +391,7 @@ void MarkdownLayout::drawTextCursorIfNeeded(QPainter *painter, const PaintContex
 
 // ---- Selection / hit-test helpers ---------------------------------
 
-QList<QTextLayout::FormatRange> MarkdownLayout::selectionsForBlock(const PaintContext &context, QTextBlock block) const
+QList<QTextLayout::FormatRange> MarkdownLayout::selectionsForBlock(const PaintContext &context, const QTextBlock &block) const
 {
     QList<QTextLayout::FormatRange> ranges;
 
@@ -342,7 +418,7 @@ QList<QTextLayout::FormatRange> MarkdownLayout::selectionsForBlock(const PaintCo
     return ranges;
 }
 
-int MarkdownLayout::hitTestBlock(QTextBlock block, QPointF point, Qt::HitTestAccuracy accuracy) const
+int MarkdownLayout::hitTestBlock(const QTextBlock &block, QPointF point, Qt::HitTestAccuracy accuracy) const
 {
     QTextLayout *layout = block.layout();
     if (layout->lineCount() == 0)
