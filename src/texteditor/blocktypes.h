@@ -42,8 +42,8 @@ inline void clearHeadingCharFormat(const QTextBlock &block)
 { setHeadingCharFormat(block, 0); }
 
 // Helper for applying QTextCharFormat changes fragment-by-fragment.
-// This is only used for heading char format modifications.
+// This is used for heading char format modifications.
 typedef std::function<QTextCharFormat(const QTextBlock &, QTextCharFormat)> CharFormatModifier;
-void modifyCharFormatPerFragment(const QTextCursor &cursor, const CharFormatModifier &modifier);
+void applyCharFormatModifier(const QTextCursor &cursor, const CharFormatModifier &modifier);
 
 #endif // BLOCKTYPES_H

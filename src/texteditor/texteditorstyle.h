@@ -52,7 +52,7 @@ const QTextCharFormat &defaultCharFormat();
 int defaultFontPointSize();
 
 // Encapsulated formatting logic
-bool isMarkdownStrong(const QTextCharFormat &charFormat);
+bool isStrong(const QTextCharFormat &charFormat);
 QFont::Weight blockDefaultFontWeight(const QTextBlock &block);
 
 #endif

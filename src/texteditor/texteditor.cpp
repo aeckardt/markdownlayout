@@ -2,7 +2,6 @@
 #include "texteditor_p.h"
 
 #include "blocktypes.h"
-#include "fragmentchanges.h"
 #include "htmlexporter.h"
 #include "htmlimporter.h"
 #include "markdownexporter.h"
@@ -308,7 +307,7 @@ void TextEditor::onCurrentCharFormatChanged(const QTextCharFormat &format)
 {
     emit fontChanged(format.font());
 
-    m_boldAction->setChecked(isMarkdownStrong(format));
+    m_boldAction->setChecked(isStrong(format));
     m_italicAction->setChecked(format.fontItalic());
     m_underlineAction->setChecked(format.fontUnderline());
 }
@@ -357,11 +356,11 @@ void TextEditor::updateBold()
             // Since headings and paragraphs have different default weights
             // Clearing bold/strong requires fragment-wise changes
             auto clearStrongModifier = [&](const QTextBlock &block, QTextCharFormat charFmt) {
-                if (isMarkdownStrong(charFmt))
+                if (isStrong(charFmt))
                     charFmt.setFontWeight(blockDefaultFontWeight(block));
                 return charFmt;
             };
-            applyFragmentChangesToSelection(cursor, clearStrongModifier);
+            applyCharFormatModifier(cursor, clearStrongModifier);
         }
     }
 }

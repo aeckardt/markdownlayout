@@ -147,7 +147,7 @@ void InlineFormatResolver::detectFormatChanges()
 
         // Detect all format changes
         // Handle opening tags
-        if (!isMarkdownStrong(prevFmt) && isMarkdownStrong(curFmt))
+        if (!isStrong(prevFmt) && isStrong(curFmt))
             m_formats.append({InlineFormat::Type::Bold, index});
         if (!prevFmt.fontItalic() && curFmt.fontItalic())
             m_formats.append({InlineFormat::Type::Italic, index});
@@ -167,7 +167,7 @@ void InlineFormatResolver::detectFormatChanges()
                 m_formats[i].end = index;
         };
 
-        if (isMarkdownStrong(curFmt) && !isMarkdownStrong(nextFmt))
+        if (isStrong(curFmt) && !isStrong(nextFmt))
             closeLast(InlineFormat::Type::Bold);
         if (curFmt.fontItalic() && !nextFmt.fontItalic())
             closeLast(InlineFormat::Type::Italic);

@@ -168,7 +168,7 @@ QTextCharFormat headingFormatModifier(int headingLevel, QTextCharFormat charFmt)
 {
     // Set / remove heading-specific visual formatting
     // depending on headingLevel (0 -> no heading)
-    const bool bold = isMarkdownStrong(charFmt);
+    const bool bold = isStrong(charFmt);
     if (headingLevel > 0) {
         charFmt.setFontWeight(
                     bold
@@ -192,7 +192,7 @@ void setHeadingCharFormat(const QTextBlock &block, int headingLevel)
     localCursor.beginEditBlock();
 
     // Handle existing fragments one-by-one
-    modifyCharFormatPerFragment(localCursor, [&](const QTextBlock &, QTextCharFormat charFmt) {
+    applyCharFormatModifier(localCursor, [&](const QTextBlock &, QTextCharFormat charFmt) {
         return headingFormatModifier(headingLevel, charFmt);
     });
 
@@ -208,7 +208,7 @@ struct CharFormatUpdate {
     QTextCharFormat newCharFmt;
 };
 
-void modifyCharFormatPerFragment(const QTextCursor &cursor, const CharFormatModifier &modifier)
+void applyCharFormatModifier(const QTextCursor &cursor, const CharFormatModifier &modifier)
 {
     if (!cursor.hasSelection())
         return;

@@ -142,7 +142,7 @@ int defaultFontPointSize()
     return 13;
 }
 
-bool isMarkdownStrong(const QTextCharFormat &charFormat)
+bool isStrong(const QTextCharFormat &charFormat)
 {
     return charFormat.fontWeight() >= StrongFontWeight;
 }
