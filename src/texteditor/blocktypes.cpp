@@ -1,10 +1,10 @@
 #include "blocktypes.h"
 
-#include "fragmentchanges.h"
 #include "texteditorstyle.h"
 #include "texteditorstyle_p.h"
 
 #include <QTextBlock>
+#include <QTextCharFormat>
 #include <QTextCursor>
 #include <QTextList>
 
@@ -131,6 +131,39 @@ void setBlockTypeForBlock(const QTextBlock &block, BlockType type, bool toggle)
     localCursor.endEditBlock();
 }
 
+QVector<QTextBlock> selectedBlocks(const QTextCursor &cursor)
+{
+    int start = cursor.selectionStart();
+    int end = cursor.selectionEnd();
+
+    if (start == end) {
+        if (!cursor.block().isValid())
+            return {};
+        return {cursor.block()};
+    }
+
+    QTextDocument *doc = cursor.document();
+
+    QTextBlock firstBlock = doc->findBlock(start);
+    QTextBlock lastBlock = doc->findBlock(end);
+
+    //  If the selection ends exactly at the beginning of a block, that block
+    //  is not part of the user's visible selection.
+    if (end == lastBlock.position() && lastBlock != firstBlock)
+        lastBlock = lastBlock.previous();
+
+    QVector<QTextBlock> blocks;
+    QTextBlock block = firstBlock;
+    while (block.isValid()) {
+        blocks.append(block);
+        if (block == lastBlock)
+            break;
+        block = block.next();
+    }
+
+    return blocks;
+}
+
 QTextCharFormat headingFormatModifier(int headingLevel, QTextCharFormat charFmt)
 {
     // Set / remove heading-specific visual formatting
@@ -154,16 +187,67 @@ QTextCharFormat headingFormatModifier(int headingLevel, QTextCharFormat charFmt)
 
 void setHeadingCharFormat(const QTextBlock &block, int headingLevel)
 {
-    QTextCursor cursor(block);
-    cursor.beginEditBlock();
+    QTextCursor localCursor(block);
+    localCursor.select(QTextCursor::BlockUnderCursor);
+    localCursor.beginEditBlock();
 
     // Handle existing fragments one-by-one
-    applyFragmentChangesToBlock(block, [&](const QTextBlock &, QTextCharFormat charFmt) {
+    modifyCharFormatPerFragment(localCursor, [&](const QTextBlock &, QTextCharFormat charFmt) {
         return headingFormatModifier(headingLevel, charFmt);
     });
 
     // Change the block char format as a fallback for empty blocks
-    cursor.setBlockCharFormat(headingFormatModifier(headingLevel, defaultCharFormat()));
+    localCursor.setBlockCharFormat(headingFormatModifier(headingLevel, defaultCharFormat()));
 
-    cursor.endEditBlock();
+    localCursor.endEditBlock();
+}
+
+struct CharFormatUpdate {
+    int start;
+    int end;
+    QTextCharFormat newCharFmt;
+};
+
+void modifyCharFormatPerFragment(const QTextCursor &cursor, const CharFormatModifier &modifier)
+{
+    if (!cursor.hasSelection())
+        return;
+
+    int startPos = cursor.selectionStart();
+    int endPos = cursor.selectionEnd();
+
+    QTextDocument *doc = cursor.document();
+    QTextBlock block = doc->findBlock(cursor.selectionStart());
+
+    QVector<CharFormatUpdate> updates;
+
+    while (block.position() <= endPos && block.isValid()) {
+        QTextBlock::iterator it = block.begin();
+        while (!it.atEnd()) {
+            const QTextFragment fragment = it.fragment();
+            if (fragment.isValid()) {
+                int fragmentStart = fragment.position();
+                int fragmentEnd = fragment.position() + fragment.length();
+
+                int start = std::max<int>(startPos, fragmentStart);
+                int end = std::min<int>(endPos, fragmentEnd);
+
+                if (start < end) {
+                    const QTextCharFormat charFmt = fragment.charFormat();
+                    updates.append({start, end, modifier(block, charFmt)});
+                }
+            }
+            ++it;
+        }
+        block = block.next();
+    }
+
+    QTextCursor localCursor(doc);
+    localCursor.beginEditBlock();
+    for (const CharFormatUpdate &update : updates) {
+        localCursor.setPosition(update.start);
+        localCursor.setPosition(update.end, QTextCursor::MoveMode::KeepAnchor);
+        localCursor.setCharFormat(update.newCharFmt);
+    }
+    localCursor.endEditBlock();
 }
