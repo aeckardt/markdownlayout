@@ -361,7 +361,7 @@ void TextEditor::updateBold()
                     charFmt.setFontWeight(blockDefaultFontWeight(block));
                 return charFmt;
             };
-            applyFragmentChangesToSelection(cursor, clearStrongModifier);
+            applyFragmentCharFormatChangesToSelection(cursor, clearStrongModifier);
         }
     }
 }
@@ -510,8 +510,6 @@ void TextEditor::insertBlock()
 
     cursor.beginEditBlock();
     if (posInBlock == 0 && cursor.selectionStart() == cursor.selectionEnd()) {
-        cursor.setCharFormat(defaultCharFormat());
-
         // The cursor is at the beginning of the line
         // Move all char and block formatting to the new line
         cursor.insertBlock();
@@ -521,6 +519,7 @@ void TextEditor::insertBlock()
         if (isHeading(type) || type == BlockType::BlockQuote) {
             cursor.setPosition(cursor.position() - 1);
             cursor.setBlockFormat(defaultBlockFormat());
+            cursor.setBlockCharFormat(defaultCharFormat());
         }
     } else if (type == BlockType::TextList)
         cursor.insertBlock(block.blockFormat());
@@ -604,11 +603,7 @@ void TextEditor::keyPressEvent(QKeyEvent *event)
         if (type == BlockType::Paragraph) {
             static const QMap<QString, BlockType> typeMarker = {
                 {QStringLiteral("*"), BlockType::TextList},
-                {QStringLiteral(">"), BlockType::BlockQuote},
-                {QStringLiteral("#"), BlockType::Heading1},
-                {QStringLiteral("##"), BlockType::Heading2},
-                {QStringLiteral("###"), BlockType::Heading3},
-                {QStringLiteral("####"), BlockType::Heading4}
+                {QStringLiteral(">"), BlockType::BlockQuote}
             };
             static const QList<QString> keys = typeMarker.keys();
 
@@ -655,6 +650,14 @@ void TextEditor::keyPressEvent(QKeyEvent *event)
             }
         }
         break;
+    }
+    case Qt::Key_Delete: {
+        QTextCursor cursor = textCursor();
+        QTextBlockFormat blockFmt = cursor.blockFormat();
+        QTextEdit::keyPressEvent(event);
+        if (blockFmt != cursor.blockFormat())
+            emit blockFormatChanged(cursor.block());
+        return;
     }
     case Qt::Key_Minus: {
         QTextCursor cursor = textCursor();

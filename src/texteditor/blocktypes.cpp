@@ -96,10 +96,15 @@ void setBlockTypeForBlock(const QTextBlock &block, BlockType type, bool toggle)
         break;
     }
     case BlockType::TextList: {
-        // Create a QTextList object on the cursor.
-        QTextList *textList = localCursor.createList(TopLevelListStyle);
+        // See if a QTextList object exists in the previous block
+        const QTextBlock previousBlock = block.previous();
+        const QTextList *textList = previousBlock.textList();
 
-        // Attach the new QTextList object to a clean (default-based) block format.
+        // If not, create a new QTextList object on the cursor.
+        if (!textList)
+            textList = localCursor.createList(TopLevelListStyle);
+
+        // Attach the QTextList object to a clean (default-based) block format.
         blockFmt.setObjectIndex(textList->objectIndex());
         break;
     }
@@ -126,36 +131,39 @@ void setBlockTypeForBlock(const QTextBlock &block, BlockType type, bool toggle)
     localCursor.endEditBlock();
 }
 
+QTextCharFormat headingFormatModifier(int headingLevel, QTextCharFormat charFmt)
+{
+    // Set / remove heading-specific visual formatting
+    // depending on headingLevel (0 -> no heading)
+    const bool bold = isMarkdownStrong(charFmt);
+    if (headingLevel > 0) {
+        charFmt.setFontWeight(
+                    bold
+                    ? StrongFontWeight
+                    : HeadingFontWeight);
+        charFmt.setProperty(QTextCharFormat::Property::FontSizeAdjustment, 4 - headingLevel);
+    } else {
+        charFmt.setFontWeight(
+                    bold
+                    ? StrongFontWeight
+                    : NormalFontWeight);
+        charFmt.clearProperty(QTextCharFormat::Property::FontSizeAdjustment);
+    }
+    return charFmt;
+}
+
 void setHeadingCharFormat(const QTextBlock &block, int headingLevel)
 {
-    auto headingFormatModifier = [&](const QTextBlock &, QTextCharFormat charFmt) {
-        // Set / remove heading-specific visual formatting
-        // depending on headingLevel (0 -> no heading)
-        const bool bold = isMarkdownStrong(charFmt);
-        if (headingLevel > 0) {
-            charFmt.setFontWeight(
-                        bold
-                        ? StrongFontWeight
-                        : HeadingFontWeight);
-            charFmt.setProperty(QTextCharFormat::Property::FontSizeAdjustment, 4 - headingLevel);
-        } else {
-            charFmt.setFontWeight(
-                        bold
-                        ? StrongFontWeight
-                        : NormalFontWeight);
-            charFmt.clearProperty(QTextCharFormat::Property::FontSizeAdjustment);
-        }
-        return charFmt;
-    };
-
     QTextCursor cursor(block);
     cursor.beginEditBlock();
 
     // Handle existing fragments one-by-one
-    applyFragmentChangesToBlock(block, headingFormatModifier);
+    applyFragmentCharFormatChangesToBlock(block, [&](const QTextBlock &, QTextCharFormat charFmt) {
+        return headingFormatModifier(headingLevel, charFmt);
+    });
 
     // Change the block char format as a fallback for empty blocks
-    cursor.setBlockCharFormat(headingFormatModifier(block, defaultCharFormat()));
+    cursor.setBlockCharFormat(headingFormatModifier(headingLevel, defaultCharFormat()));
 
     cursor.endEditBlock();
 }

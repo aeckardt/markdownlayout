@@ -4,37 +4,37 @@
 #include <QTextCursor>
 #include <QTextDocument>
 
-void applyFragmentChangesToRange(const QVector<QTextBlock> &blocks,
-                                 int startPos, int endPos,
-                                 const CharFormatModifier &modifier);
-
-void applyFragmentChangesToSelection(const QTextCursor &cursor, const CharFormatModifier &modifier)
-{
-    applyFragmentChangesToRange(
-                selectedBlocks(cursor),
-                cursor.selectionStart(),
-                cursor.selectionEnd(),
-                modifier);
-}
-
-void applyFragmentChangesToBlock(const QTextBlock &block, const CharFormatModifier &modifier)
-{
-    applyFragmentChangesToRange(
-                {block},
-                block.position(),
-                block.position() + block.length(),
-                modifier);
-}
-
 struct CharFormatUpdate {
     int start;
     int end;
     QTextCharFormat newCharFmt;
 };
 
-void applyFragmentChangesToRange(const QVector<QTextBlock> &blocks,
+void applyFragmentCharFormatChangesToRange(const QVector<QTextBlock> &blocks,
                                  int startPos, int endPos,
-                                 const CharFormatModifier &modifier)
+                                 const CharFormatModifier &modifier);
+
+void applyFragmentCharFormatChangesToSelection(const QTextCursor &cursor, const CharFormatModifier &modifier)
+{
+    applyFragmentCharFormatChangesToRange(
+                selectedBlocks(cursor),
+                cursor.selectionStart(),
+                cursor.selectionEnd(),
+                modifier);
+}
+
+void applyFragmentCharFormatChangesToBlock(const QTextBlock &block, const CharFormatModifier &modifier)
+{
+    applyFragmentCharFormatChangesToRange(
+                {block},
+                block.position(),
+                block.position() + block.length(),
+                modifier);
+}
+
+void applyFragmentCharFormatChangesToRange(const QVector<QTextBlock> &blocks,
+                                           int startPos, int endPos,
+                                           const CharFormatModifier &modifier)
 {
     if (blocks.isEmpty())
         return;

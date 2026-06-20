@@ -12,6 +12,57 @@ const QColor &linkColor()
     return color;
 }
 
+const QTextLength &horizontalRulerWidth()
+{
+    static QTextLength hrw;
+    static bool init = false;
+
+    if (init)
+        return hrw;
+
+#ifdef HORIZONTAL_RULER_WIDTH
+    const QString widthStr = QStringLiteral(HORIZONTAL_RULER_WIDTH);
+    QString valueStr = widthStr.trimmed();
+    if (valueStr.endsWith(QStringLiteral("%"))) {
+        while (valueStr.endsWith(QLatin1Char('%')) || valueStr.endsWith(QLatin1Char(' ')))
+            valueStr.chop(1);
+
+        bool ok = false;
+        const double floatVal = valueStr.toDouble(&ok);
+
+        if (ok)
+            hrw = QTextLength(QTextLength::PercentageLength, floatVal);
+    } else {
+        bool ok = false;
+        const double floatVal = valueStr.toDouble(&ok);
+
+        if (ok)
+            hrw = QTextLength(QTextLength::FixedLength, floatVal);
+    }
+#endif
+
+    init = true;
+    return hrw;
+}
+
+const QColor &horizontalRulerColor()
+{
+    static QColor hrc;
+    static bool init = false;
+
+    if (init)
+        return hrc;
+
+#ifdef HORIZONTAL_RULER_COLOR
+    hrc = QColor(HORIZONTAL_RULER_COLOR);
+#else
+    hrc = QColor::Invalid;
+#endif
+
+    init = true;
+    return hrc;
+}
+
 /*
  * Sets up properties for a QTextBlockFormat that is used each time
  * a new block is added to a QTextDocument in TextEditor.
@@ -64,57 +115,6 @@ const QTextBlockFormat &defaultBlockFormat()
 
     init = true;
     return blockFmt;
-}
-
-const QTextLength &horizontalRulerWidth()
-{
-    static QTextLength hrw;
-    static bool init = false;
-
-    if (init)
-        return hrw;
-
-#ifdef HORIZONTAL_RULER_WIDTH
-    const QString widthStr = QStringLiteral(HORIZONTAL_RULER_WIDTH);
-    QString valueStr = widthStr.trimmed();
-    if (valueStr.endsWith(QStringLiteral("%"))) {
-        while (valueStr.endsWith(QLatin1Char('%')) || valueStr.endsWith(QLatin1Char(' ')))
-            valueStr.chop(1);
-
-        bool ok = false;
-        const double floatVal = valueStr.toDouble(&ok);
-
-        if (ok)
-            hrw = QTextLength(QTextLength::PercentageLength, floatVal);
-    } else {
-        bool ok = false;
-        const double floatVal = valueStr.toDouble(&ok);
-
-        if (ok)
-            hrw = QTextLength(QTextLength::FixedLength, floatVal);
-    }
-#endif
-
-    init = true;
-    return hrw;
-}
-
-const QColor &horizontalRulerColor()
-{
-    static QColor hrc;
-    static bool init = false;
-
-    if (init)
-        return hrc;
-
-#ifdef HORIZONTAL_RULER_COLOR
-    hrc = QColor(HORIZONTAL_RULER_COLOR);
-#else
-    hrc = QColor::Invalid;
-#endif
-
-    init = true;
-    return hrc;
 }
 
 const QTextCharFormat &defaultCharFormat()

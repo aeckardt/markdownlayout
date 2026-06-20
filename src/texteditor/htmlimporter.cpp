@@ -1,5 +1,7 @@
 #include "htmlimporter.h"
 #include "htmlimporter_p.h"
+
+#include "blocktypes.h"
 #include "htmlstyle.h"
 #include "texteditorstyle.h"
 
@@ -537,9 +539,7 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
         m_blockFmt.setHeadingLevel(headingLevel);
 
         // Adjust char format for new block
-        QTextCharFormat headingCharFmt;
-        headingCharFmt.setFontWeight(HeadingFontWeight);
-        headingCharFmt.setProperty(QTextCharFormat::Property::FontSizeAdjustment, 4 - headingLevel);
+        QTextCharFormat headingCharFmt = headingFormatModifier(headingLevel, QTextCharFormat());
         m_cursor->mergeBlockCharFormat(headingCharFmt);
 
         // Use heading char format for next fragment(s)

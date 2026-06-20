@@ -1,5 +1,7 @@
 #include "texteditor/markdownimporter.h"
 #include "texteditor/markdownimporter_p.h"
+
+#include "blocktypes.h"
 #include "texteditor/htmlstyle.h"
 #include "texteditor/texteditorstyle.h"
 
@@ -115,9 +117,7 @@ void MarkdownRenderer::renderBlocks(const QVector<MarkdownBlockToken> &tokens)
             m_blockFmt.setHeadingLevel(token.level);
 
             // Adjust char format for new block
-            QTextCharFormat headingCharFmt;
-            headingCharFmt.setFontWeight(HeadingFontWeight);
-            headingCharFmt.setProperty(QTextCharFormat::Property::FontSizeAdjustment, 4 - token.level);
+            QTextCharFormat headingCharFmt = headingFormatModifier(token.level, QTextCharFormat());
             m_cursor->mergeBlockCharFormat(headingCharFmt);
 
             // Use heading char format for next fragment(s)

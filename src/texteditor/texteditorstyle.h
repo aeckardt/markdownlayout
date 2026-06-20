@@ -5,10 +5,10 @@
 #include <QTextListFormat>
 
 class QColor;
-class QTextBlockFormat;
-class QTextLength;
-class QTextCharFormat;
 class QTextBlock;
+class QTextBlockFormat;
+class QTextCharFormat;
+class QTextLength;
 
 /*
  * Style configuration:
@@ -40,10 +40,11 @@ inline constexpr QFont::Weight StrongFontWeight  = QFont::Bold;
 // Static const variables available with initialization
 const QColor &linkColor();
 
-// Default block format for TextEditor
-const QTextBlockFormat &defaultBlockFormat();
 const QTextLength &horizontalRulerWidth();
 const QColor &horizontalRulerColor();
+
+// Default block format for TextEditor
+const QTextBlockFormat &defaultBlockFormat();
 
 // Default char format for TextEditor
 // Needs to be initialized after QGuiApplication starts running
