@@ -10,29 +10,29 @@ struct CharFormatUpdate {
     QTextCharFormat newCharFmt;
 };
 
-void applyFragmentCharFormatChangesToRange(const QVector<QTextBlock> &blocks,
+void applyFragmentChangesToRange(const QVector<QTextBlock> &blocks,
                                  int startPos, int endPos,
                                  const CharFormatModifier &modifier);
 
-void applyFragmentCharFormatChangesToSelection(const QTextCursor &cursor, const CharFormatModifier &modifier)
+void applyFragmentChangesToSelection(const QTextCursor &cursor, const CharFormatModifier &modifier)
 {
-    applyFragmentCharFormatChangesToRange(
+    applyFragmentChangesToRange(
                 selectedBlocks(cursor),
                 cursor.selectionStart(),
                 cursor.selectionEnd(),
                 modifier);
 }
 
-void applyFragmentCharFormatChangesToBlock(const QTextBlock &block, const CharFormatModifier &modifier)
+void applyFragmentChangesToBlock(const QTextBlock &block, const CharFormatModifier &modifier)
 {
-    applyFragmentCharFormatChangesToRange(
+    applyFragmentChangesToRange(
                 {block},
                 block.position(),
                 block.position() + block.length(),
                 modifier);
 }
 
-void applyFragmentCharFormatChangesToRange(const QVector<QTextBlock> &blocks,
+void applyFragmentChangesToRange(const QVector<QTextBlock> &blocks,
                                            int startPos, int endPos,
                                            const CharFormatModifier &modifier)
 {

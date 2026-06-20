@@ -14,8 +14,8 @@ class QTextCursor;
 
 typedef std::function<QTextCharFormat(const QTextBlock &, QTextCharFormat)> CharFormatModifier;
 
-void applyFragmentCharFormatChangesToSelection(const QTextCursor &cursor, const CharFormatModifier &modifier);
-void applyFragmentCharFormatChangesToBlock(const QTextBlock &block, const CharFormatModifier &modifier);
+void applyFragmentChangesToSelection(const QTextCursor &cursor, const CharFormatModifier &modifier);
+void applyFragmentChangesToBlock(const QTextBlock &block, const CharFormatModifier &modifier);
 
 QVector<QTextBlock> selectedBlocks(const QTextCursor &cursor);
 

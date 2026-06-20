@@ -361,7 +361,7 @@ void TextEditor::updateBold()
                     charFmt.setFontWeight(blockDefaultFontWeight(block));
                 return charFmt;
             };
-            applyFragmentCharFormatChangesToSelection(cursor, clearStrongModifier);
+            applyFragmentChangesToSelection(cursor, clearStrongModifier);
         }
     }
 }

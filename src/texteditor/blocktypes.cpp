@@ -158,7 +158,7 @@ void setHeadingCharFormat(const QTextBlock &block, int headingLevel)
     cursor.beginEditBlock();
 
     // Handle existing fragments one-by-one
-    applyFragmentCharFormatChangesToBlock(block, [&](const QTextBlock &, QTextCharFormat charFmt) {
+    applyFragmentChangesToBlock(block, [&](const QTextBlock &, QTextCharFormat charFmt) {
         return headingFormatModifier(headingLevel, charFmt);
     });
 
