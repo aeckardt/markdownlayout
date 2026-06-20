@@ -11,7 +11,8 @@ QMAKE_CXXFLAGS += -fmessage-length=0
 
 SOURCES += \
     src/layouttest_main.cpp \
-    src/markdownlayout/markdownlayout.cpp \
+    src/texteditor/blocktypes.cpp \
+    src/texteditor/fragmentchanges.cpp \
     src/texteditor/gradientbutton.cpp \
     src/texteditor/inlineformatresolver.cpp \
     src/texteditor/htmlexporter.cpp \
@@ -21,13 +22,15 @@ SOURCES += \
     src/texteditor/markdownexporter.cpp \
     src/texteditor/markdownimporter.cpp \
     src/texteditor/markdowninlineparser.cpp \
+    src/texteditor/markdownlayout.cpp \
     src/texteditor/texteditor.cpp \
     src/texteditor/texteditorstyle.cpp \
     src/texteditor/texteditorwidget.cpp \
     src/texteditor/toolbarseparator.cpp
 
 HEADERS += \
-    src/markdownlayout/markdownlayout.h \
+    src/texteditor/blocktypes.h \
+    src/texteditor/fragmentchanges.h \
     src/texteditor/gradientbutton.h \
     src/texteditor/htmlimporter_p.h \
     src/texteditor/inlineformatresolver.h \
@@ -39,6 +42,7 @@ HEADERS += \
     src/texteditor/markdownimporter.h \
     src/texteditor/markdownimporter_p.h \
     src/texteditor/markdowninlineparser.h \
+    src/texteditor/markdownlayout.h \
     src/texteditor/texteditor.h \
     src/texteditor/texteditor_p.h \
     src/texteditor/texteditorstyle.h \

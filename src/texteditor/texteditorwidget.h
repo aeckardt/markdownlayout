@@ -34,10 +34,13 @@ private:
 private slots:
     void onFontChanged(const QFont &font);
     void onBlockFormatChanged(const QTextBlock &block);
-    void setHeadingLevel(int level);
     void updateBlockFormatButtons();
 
 private:
+    void setHeadingLevel(int level);
+    void makeParagraph();
+    void toggleList();
+
     static QImage loadIconImage(const QString &iconName);
 
     QToolBar *m_toolbar;

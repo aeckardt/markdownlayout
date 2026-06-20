@@ -1,6 +1,8 @@
 #include "texteditor.h"
 #include "texteditor_p.h"
 
+#include "blocktypes.h"
+#include "fragmentchanges.h"
 #include "htmlexporter.h"
 #include "htmlimporter.h"
 #include "markdownexporter.h"
@@ -30,8 +32,6 @@
 #include <QUrl>
 
 #include <algorithm>
-
-using namespace TextEditorStyle;
 
 TextEditor::TextEditor(QWidget *parent)
     : QTextEdit(parent),
@@ -171,27 +171,6 @@ void TextEditor::setDocument(QTextDocument *document)
     // Move cursor to the start
     moveCursor(QTextCursor::Start);
     ensureCursorVisible();
-}
-
-TextEditor::BlockType TextEditor::blockType(const QTextBlock &block) const
-{
-    const QTextBlockFormat blockFmt = block.blockFormat();
-    if (blockFmt.headingLevel() > 0)
-        return static_cast<BlockType>((int)BlockType::Heading1 + blockFmt.headingLevel() - 1);
-    if (blockFmt.objectIndex() != -1 && block.textList())
-        return BlockType::TextList;
-    if (blockFmt.hasProperty(QTextFormat::BlockQuoteLevel))
-        return BlockType::BlockQuote;
-    if (blockFmt.hasProperty(QTextFormat::BlockTrailingHorizontalRulerWidth))
-        return BlockType::HorizontalRuler;
-    return BlockType::Paragraph;
-}
-
-int TextEditor::headingLevel(BlockType type)
-{
-    if (type < Heading1 || type > Heading4)
-        return 0;
-    return (int)type - (int)Heading1 + 1;
 }
 
 /*
@@ -367,10 +346,24 @@ void TextEditor::updateBold()
         QTextCharFormat charFmt;
         charFmt.setFontWeight(StrongFontWeight);
         mergeFormatOnSelection(charFmt);
-    } else
-        // Since headings and paragraphs have different default weights
-        // Clearing bold/strong requires a little more work
-        clearStrongOnSelection();
+    } else {
+        const QTextCursor cursor = textCursor();
+        if (!cursor.hasSelection()) {
+            // Without a selection, formatting only changes the current typing format
+            QTextCharFormat charFmt;
+            charFmt.setFontWeight(blockDefaultFontWeight(cursor.block()));
+            mergeFormatOnSelection(charFmt);
+        } else {
+            // Since headings and paragraphs have different default weights
+            // Clearing bold/strong requires fragment-wise changes
+            auto clearStrongModifier = [&](const QTextBlock &block, QTextCharFormat charFmt) {
+                if (isMarkdownStrong(charFmt))
+                    charFmt.setFontWeight(blockDefaultFontWeight(block));
+                return charFmt;
+            };
+            applyFragmentChangesToSelection(cursor, clearStrongModifier);
+        }
+    }
 }
 
 void TextEditor::updateItalic()
@@ -434,116 +427,6 @@ void TextEditor::textsizeMinus()
     }
 }
 
-void TextEditor::clearStrongOnSelection()
-{
-    QTextCursor cursor = textCursor();
-
-    // Without a selection, formatting only changes the current typing format
-    if (!cursor.hasSelection()) {
-        QTextCharFormat charFmt;
-        charFmt.setFontWeight(blockDefaultFontWeight(cursor.block()));
-        mergeFormatOnSelection(charFmt);
-        return;
-    }
-
-    // Change text under cursor
-    auto clearStrongModifier = [&](const QTextBlock &block, QTextCharFormat charFmt) {
-        if (isMarkdownStrong(charFmt))
-            charFmt.setFontWeight(blockDefaultFontWeight(block));
-        return charFmt;
-    };
-    applyFragmentChangesToSelection(clearStrongModifier);
-}
-
-void TextEditor::setHeadingCharFormat(const QTextBlock &block, int headingLevel)
-{
-    auto headingFormatModifier = [&](const QTextBlock &, QTextCharFormat charFmt) {
-        // Set / remove heading-specific visual formatting
-        // depending on headingLevel (0 -> no heading)
-        const bool isStrong = isMarkdownStrong(charFmt);
-        if (headingLevel > 0) {
-            charFmt.setFontWeight(
-                        isStrong
-                        ? StrongFontWeight
-                        : HeadingFontWeight);
-            charFmt.setProperty(QTextCharFormat::Property::FontSizeAdjustment, 4 - headingLevel);
-        } else {
-            charFmt.setFontWeight(
-                        isStrong
-                        ? StrongFontWeight
-                        : NormalFontWeight);
-            charFmt.clearProperty(QTextCharFormat::Property::FontSizeAdjustment);
-        }
-        return charFmt;
-    };
-
-    QTextCursor cursor(block);
-    cursor.beginEditBlock();
-
-    // Handle existing fragments one-by-one
-    applyFragmentChangesToBlock(block, headingFormatModifier);
-
-    // Change the block char format as a fallback for empty blocks
-    cursor.setBlockCharFormat(headingFormatModifier(block, defaultCharFormat()));
-
-    cursor.endEditBlock();
-}
-
-void TextEditor::applyFragmentChangesToSelection(const FormatModifier &modifier)
-{
-    QTextCursor cursor = textCursor();
-    applyFragmentChangesToRange(
-                selectedBlocks(),
-                cursor.selectionStart(),
-                cursor.selectionEnd(),
-                modifier);
-}
-
-void TextEditor::applyFragmentChangesToBlock(const QTextBlock &block, const FormatModifier &modifier)
-{
-    applyFragmentChangesToRange(
-                {block},
-                block.position(),
-                block.position() + block.length(),
-                modifier);
-}
-
-void TextEditor::applyFragmentChangesToRange(const QVector<QTextBlock> &blocks,
-                                             int startPos, int endPos,
-                                             const FormatModifier &modifier)
-{
-    QVector<CharFormatUpdate> updates;
-
-    for (const QTextBlock &block : blocks) {
-        QTextBlock::iterator it = block.begin();
-        while (!it.atEnd()) {
-            const QTextFragment fragment = it.fragment();
-            if (fragment.isValid()) {
-                int fragmentStart = fragment.position();
-                int fragmentEnd = fragment.position() + fragment.length();
-
-                int start = std::max<int>(startPos, fragmentStart);
-                int end = std::min<int>(endPos, fragmentEnd);
-
-                if (start < end) {
-                    const QTextCharFormat charFmt = fragment.charFormat();
-                    updates.append({start, end, modifier(block, charFmt)});
-                }
-            }
-            ++it;
-        }
-    }
-
-    QTextCursor localCursor(document());
-    localCursor.beginEditBlock();
-    for (const CharFormatUpdate &update : updates) {
-        localCursor.setPosition(update.start);
-        localCursor.setPosition(update.end, QTextCursor::MoveMode::KeepAnchor);
-        localCursor.setCharFormat(update.newCharFmt);
-    }
-    localCursor.endEditBlock();
-}
-
 void TextEditor::mergeFormatOnSelection(const QTextCharFormat &charFmt, bool selectWord)
 {
     QTextCursor cursor = textCursor();
@@ -565,104 +448,6 @@ void TextEditor::mergeFormatOnSelection(const QTextCharFormat &charFmt, bool sel
     cursor.endEditBlock();
 }
 
-void TextEditor::setBlockType(BlockType type, ScopePolicy policy, bool toggle)
-{
-    // ScopePolicy models the affected blocks in the document.
-    if (policy == ScopePolicy::CurrentBlock) {
-        setBlockTypeForBlock(textCursor().block(), type, toggle);
-        return;
-    }
-
-    QVector<QTextBlock> blocks = selectedBlocks();
-
-    bool allOfType = true;
-    for (const QTextBlock &block : blocks) {
-        if (blockType(block) != type) {
-            allOfType = false;
-            break;
-        }
-    }
-
-    BlockType newType;
-    if (allOfType) {
-        // If toggle is true and all affected blocks already have the requested type,
-        // they are reset to Paragraph.
-        if (!toggle)
-            return;
-        newType = BlockType::Paragraph;
-    } else
-        newType = type;
-
-    QTextCursor cursor = textCursor();
-    cursor.beginEditBlock();
-    for (const QTextBlock &block : blocks)
-        setBlockTypeForBlock(block, newType);
-    cursor.endEditBlock();
-}
-
-void TextEditor::setBlockTypeForBlock(const QTextBlock &block, BlockType type, bool toggle)
-{
-    BlockType oldType = blockType(block);
-    if (oldType == type) {
-        if (toggle && oldType != BlockType::Paragraph)
-            setBlockTypeForBlock(block, BlockType::Paragraph);
-        return;
-    }
-
-    QTextCursor localCursor(block);
-    localCursor.beginEditBlock();
-
-    // Clear old heading format, if necessary
-    int oldLevel = headingLevel(oldType);
-    int level = headingLevel(type);
-    if (oldLevel > 0 && level == 0)
-        clearHeadingCharFormat(block);
-
-    // Start from the default block format so switching a new block type clears old
-    // block metadata such as list object index, quote level, or horizontal rule.
-    QTextBlockFormat blockFmt(defaultBlockFormat());
-    switch (type) {
-    case BlockType::Heading1:
-    case BlockType::Heading2:
-    case BlockType::Heading3:
-    case BlockType::Heading4: {
-        setHeadingCharFormat(block, level);
-        blockFmt.setHeadingLevel(level);
-        break;
-    }
-    case BlockType::TextList: {
-        // Create a QTextList object on the cursor.
-        QTextList *textList = localCursor.createList(TopLevelListStyle);
-
-        // Attach the new QTextList object to a clean (default-based) block format.
-        blockFmt.setObjectIndex(textList->objectIndex());
-        break;
-    }
-    case BlockType::BlockQuote:
-        blockFmt.setProperty(QTextFormat::BlockQuoteLevel, 1);
-        break;
-    case BlockType::HorizontalRuler:
-        // Remove text in line before making horizontal ruler
-        localCursor.select(QTextCursor::LineUnderCursor);
-        localCursor.removeSelectedText();
-
-        blockFmt.setProperty(QTextFormat::BlockTrailingHorizontalRulerWidth, horizontalRulerWidth());
-#ifdef HORIZONTAL_RULER_COLOR
-        blockFmt.setProperty(QTextFormat::BackgroundBrush, horizontalRulerColor());
-#endif
-
-        break;
-    default:
-        // Nothing to do for paragraph
-        ;
-    }
-
-    localCursor.setBlockFormat(blockFmt);
-    localCursor.endEditBlock();
-
-    emit blockFormatChanged(block);
-}
-
 /*
  * Indent/Unindent affects selected list items.
  * Non-list paragraphs inside the selection are ignored.
@@ -671,7 +456,7 @@ void TextEditor::setBlockTypeForBlock(const QTextBlock &block, BlockType type, b
 void TextEditor::adjustListIndentation(int delta)
 {
     QTextCursor cursor = textCursor();
-    QVector<QTextBlock> blocks = selectedBlocks();
+    QVector<QTextBlock> blocks = selectedBlocks(cursor);
 
     // Remove all blocks from selection that are not list items
     for (int i = blocks.size() - 1; i >= 0; --i) {
@@ -713,38 +498,6 @@ void TextEditor::adjustListIndentationForBlock(const QTextBlock &block, int delt
     emit blockFormatChanged(block);
 }
 
-QVector<QTextBlock> TextEditor::selectedBlocks() const
-{
-    QTextCursor cursor = textCursor();
-
-    int start = cursor.selectionStart();
-    int end = cursor.selectionEnd();
-
-    if (start == end)
-        return {cursor.block()};
-
-    QTextDocument *doc = document();
-
-    QTextBlock firstBlock = doc->findBlock(start);
-    QTextBlock lastBlock = doc->findBlock(end);
-
-    //  If the selection ends exactly at the beginning of a block, that block
-    //  is not part of the user's visible selection.
-    if (end == lastBlock.position() && lastBlock != firstBlock)
-        lastBlock = lastBlock.previous();
-
-    QVector<QTextBlock> blocks;
-    QTextBlock block = firstBlock;
-    while (block.isValid()) {
-        blocks.append(block);
-        if (block == lastBlock)
-            break;
-        block = block.next();
-    }
-
-    return blocks;
-}
-
 /*
  * Ensure custom behavior when adding a new line with keyboard.
  */
@@ -765,11 +518,11 @@ void TextEditor::insertBlock()
 
         // If previous block has been a heading or a blockquote
         // Set default format there
-        if ((type >= Heading1 && type <= Heading4) || type == BlockQuote) {
+        if (isHeading(type) || type == BlockType::BlockQuote) {
             cursor.setPosition(cursor.position() - 1);
             cursor.setBlockFormat(defaultBlockFormat());
         }
-    } else if (type == TextList)
+    } else if (type == BlockType::TextList)
         cursor.insertBlock(block.blockFormat());
     else
         cursor.insertBlock(defaultBlockFormat(), defaultCharFormat());
@@ -881,6 +634,7 @@ void TextEditor::keyPressEvent(QKeyEvent *event)
                 localCursor.removeSelectedText();
                 setBlockTypeForBlock(block, newType);
                 localCursor.endEditBlock();
+                emit blockFormatChanged(block);
                 return;
             }
         }
@@ -896,6 +650,7 @@ void TextEditor::keyPressEvent(QKeyEvent *event)
                 cursor.removeSelectedText();
                 setBlockTypeForBlock(block, BlockType::Paragraph);
                 cursor.endEditBlock();
+                emit blockFormatChanged(block);
                 return;
             }
         }
@@ -909,8 +664,9 @@ void TextEditor::keyPressEvent(QKeyEvent *event)
             auto it = block.begin();
             if (it.fragment().text().startsWith(QStringLiteral("--"))) {
                 // Create a horizontal ruler if the line starts with three dashes
-                makeHorizontalRuler();
+                setBlockTypeForBlock(block, BlockType::HorizontalRuler);
                 insertBlock();
+                emit blockFormatChanged(block);
                 return;
             }
         }

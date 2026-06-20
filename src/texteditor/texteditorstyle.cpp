@@ -6,8 +6,6 @@
 #include <QTextBlockFormat>
 #include <QTextCharFormat>
 
-namespace TextEditorStyle {
-
 const QColor &linkColor()
 {
     static QColor color(LINK_COLOR);
@@ -158,5 +156,3 @@ QFont::Weight blockDefaultFontWeight(const QTextBlock &block)
         return HeadingFontWeight;
     return NormalFontWeight;
 }
-
-} // namespace TextEditorStyle

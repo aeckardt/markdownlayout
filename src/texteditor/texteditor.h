@@ -30,22 +30,6 @@ public:
     // Import document
     void setDocument(QTextDocument *document);
 
-    // Markdown-level block model. These are treated as exclusive block types,
-    // not as freely composable QTextBlockFormat features.
-    enum BlockType : int {
-        Paragraph       = 0,
-        Heading1        = 10,
-        Heading2        = 11,
-        Heading3        = 12,
-        Heading4        = 13,
-        TextList        = 20,
-        BlockQuote      = 30,
-        HorizontalRuler = 40
-    };
-
-    BlockType blockType(const QTextBlock &block) const;
-    static int headingLevel(BlockType type);
-
     // Copy content as Markdown to clipboard
     void copyAsMarkdown();
 
@@ -83,57 +67,13 @@ private slots:
     void textsizeMinus();
 
 private:
-    void clearStrongOnSelection();
-
-    void setHeadingCharFormat(const QTextBlock &block, int headingLevel);
-    void clearHeadingCharFormat(const QTextBlock &block)
-    { setHeadingCharFormat(block, 0); }
-
-    typedef std::function<QTextCharFormat(const QTextBlock &, QTextCharFormat)> FormatModifier;
-    struct CharFormatUpdate {
-        int start;
-        int end;
-        QTextCharFormat newCharFmt;
-    };
-
-    void applyFragmentChangesToSelection(const FormatModifier &modifier);
-    void applyFragmentChangesToBlock(const QTextBlock &block, const FormatModifier &modifier);
-    void applyFragmentChangesToRange(const QVector<QTextBlock> &blocks,
-                                     int startPos, int endPos,
-                                     const FormatModifier &modifier);
-
     void mergeFormatOnSelection(const QTextCharFormat &format, bool selectWord = false);
 
     // BlockFormat manipulation
-    enum ScopePolicy {
-        CurrentBlock,
-        SelectedBlocks
-    };
-
-    void setBlockType(BlockType type, ScopePolicy policy, bool toggle = false);
-    void setBlockTypeForBlock(const QTextBlock &block, BlockType type, bool toggle = false);
-
-    void setHeadingLevel(int level)
-    { setBlockType(static_cast<BlockType>((int)Heading1 + (level - 1)), CurrentBlock); }
-
-    void toggleList()
-    { setBlockType(TextList, SelectedBlocks, true); }
-
-    void toggleBlockQuote()
-    { setBlockType(BlockQuote, SelectedBlocks, true); }
-
-    void makeHorizontalRuler()
-    { setBlockType(HorizontalRuler, CurrentBlock); }
-
-    void removeBlockStyle()
-    { setBlockType(Paragraph, SelectedBlocks); }
-
     void indentSelection() { adjustListIndentation(1); }
     void unindentSelection() { adjustListIndentation(-1); }
     void adjustListIndentation(int delta);
     void adjustListIndentationForBlock(const QTextBlock &block, int delta);
-
-    QVector<QTextBlock> selectedBlocks() const;
 
     // Custom editor behavior
     void insertBlock();

@@ -12,7 +12,6 @@
 #include <QTextListFormat>
 
 using namespace Qt::StringLiterals;
-using namespace TextEditorStyle;
 using TokenType = MarkdownBlockToken::Type;
 using NodeType = InlineNode::Type;
 
@@ -205,8 +204,7 @@ void MarkdownRenderer::finalizeBlock()
     // Set (possibly modified) block format before adding new block
     m_cursor->setBlockFormat(m_blockFmt);
 
-    // It may be necessary to restore QTextCharFormat changes before adding a new block
-    // Otherwise the contents on the next line may not be rendered correctly
+    // Restore QTextCharFormat to set block charformat for the next line
     m_cursor->setCharFormat(m_charFmt);
 }
 

@@ -1,5 +1,6 @@
 #include "texteditorwidget.h"
 
+#include "blocktypes.h"
 #include "gradientbutton.h"
 #include "texteditor.h"
 #include "texteditorstyle.h"
@@ -15,7 +16,6 @@
 #include <QToolBar>
 
 using namespace Qt::StringLiterals;
-using namespace TextEditorStyle;
 
 TextEditorWidget::TextEditorWidget(QWidget *parent)
     : QWidget(parent)
@@ -84,22 +84,22 @@ void TextEditorWidget::setupToolBar()
 
     // Block styles
     m_headingLevel1Button = addExtToolButton("heading1"_L1,
-                                             [this]() { setHeadingLevel(1); },
+                                             std::bind(&TextEditorWidget::setHeadingLevel, this, 1),
                                              true, true, tr("Heading Level 1"));
     m_headingLevel2Button = addExtToolButton("heading2"_L1,
-                                             [this]() { setHeadingLevel(2); },
+                                             std::bind(&TextEditorWidget::setHeadingLevel, this, 2),
                                              true, true, tr("Heading Level 2"));
     m_headingLevel3Button = addExtToolButton("heading3"_L1,
-                                             [this]() { setHeadingLevel(3); },
+                                             std::bind(&TextEditorWidget::setHeadingLevel, this, 3),
                                              true, true, tr("Heading Level 3"));
     m_headingLevel4Button = addExtToolButton("heading4"_L1,
-                                             [this]() { setHeadingLevel(4); },
+                                             std::bind(&TextEditorWidget::setHeadingLevel, this, 4),
                                              true, true, tr("Heading Level 4"));
     m_paragraphButton = addExtToolButton("paragraph"_L1,
-                                         std::bind(&TextEditor::removeBlockStyle, m_textEdit),
+                                         std::bind(&TextEditorWidget::makeParagraph, this),
                                          true, false, tr("Paragraph"));
     m_listButton = addExtToolButton("list_ul"_L1,
-                                    std::bind(&TextEditor::toggleList, m_textEdit),
+                                    std::bind(&TextEditorWidget::toggleList, this),
                                     true, true, tr("List"));
 
     addSeparator();
@@ -187,30 +187,25 @@ void TextEditorWidget::onBlockFormatChanged(const QTextBlock &block)
 
 void TextEditorWidget::setHeadingLevel(int level)
 {
-    int currentLevel = m_textEdit->textCursor().blockFormat().headingLevel();
+    QTextCursor cursor = m_textEdit->textCursor();
+    int currentLevel = cursor.blockFormat().headingLevel();
     if (currentLevel != level)
-        m_textEdit->setHeadingLevel(level);
-    else {
-        // The button is automatically unchecked after being clicked
-        // That's why it's necessary to set it to checked again
-        // as long as the blockFormat has the according heading level
-        switch (level) {
-        case 1:
-            m_headingLevel1Button->setChecked(true);
-            break;
-        case 2:
-            m_headingLevel2Button->setChecked(true);
-            break;
-        case 3:
-            m_headingLevel3Button->setChecked(true);
-            break;
-        case 4:
-            m_headingLevel4Button->setChecked(true);
-            break;
-        default:
-            ;
-        }
-    }
+        setBlockTypeForBlock(cursor.block(), headingBlockType(level));
+    updateBlockFormatButtons();
+}
+
+void TextEditorWidget::makeParagraph()
+{
+    QTextCursor cursor = m_textEdit->textCursor();
+    setBlockTypeForSelection(cursor, BlockType::Paragraph);
+    updateBlockFormatButtons();
+}
+
+void TextEditorWidget::toggleList()
+{
+    QTextCursor cursor = m_textEdit->textCursor();
+    setBlockTypeForSelection(cursor, BlockType::TextList, true);
+    updateBlockFormatButtons();
 }
 
 QImage TextEditorWidget::loadIconImage(const QString &iconName)
@@ -226,11 +221,11 @@ QImage TextEditorWidget::loadIconImage(const QString &iconName)
 void TextEditorWidget::updateBlockFormatButtons()
 {
     const QTextBlock block = m_textEdit->textCursor().block();
-    TextEditor::BlockType type = m_textEdit->blockType(block);
+    BlockType type = blockType(block);
 
-    m_headingLevel1Button->setChecked(type == TextEditor::Heading1);
-    m_headingLevel2Button->setChecked(type == TextEditor::Heading2);
-    m_headingLevel3Button->setChecked(type == TextEditor::Heading3);
-    m_headingLevel4Button->setChecked(type == TextEditor::Heading4);
-    m_listButton->setChecked(type == TextEditor::TextList);
+    m_headingLevel1Button->setChecked(type == BlockType::Heading1);
+    m_headingLevel2Button->setChecked(type == BlockType::Heading2);
+    m_headingLevel3Button->setChecked(type == BlockType::Heading3);
+    m_headingLevel4Button->setChecked(type == BlockType::Heading4);
+    m_listButton->setChecked(type == BlockType::TextList);
 }

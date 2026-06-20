@@ -3,8 +3,6 @@
 
 #include <algorithm>
 
-using namespace TextEditorStyle;
-
 InlineFormatResolver::InlineFormatResolver(const QTextBlock &block, int start, int end)
     : m_block(block), m_start(start), m_end(end), m_useRange(start != -1 && end != -1), m_firstIndex(-1), m_lastIndex(-1)
 {

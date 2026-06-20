@@ -29,8 +29,6 @@ class QTextBlock;
  * use a normal constant or function instead of a macro.
 */
 
-namespace TextEditorStyle {
-
 // Modifiable TextEditor style constants
 inline constexpr QTextListFormat::Style TopLevelListStyle   = QTextListFormat::ListDisc;
 inline constexpr QTextListFormat::Style LowerLevelListStyle = QTextListFormat::ListCircle;
@@ -55,7 +53,5 @@ int defaultFontPointSize();
 // Encapsulated formatting logic
 bool isMarkdownStrong(const QTextCharFormat &charFormat);
 QFont::Weight blockDefaultFontWeight(const QTextBlock &block);
-
-} // namespace TextEditorStyle
 
 #endif

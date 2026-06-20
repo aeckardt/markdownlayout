@@ -9,7 +9,6 @@
 #include <QTextDocument>
 #include <QTextList>
 
-using namespace TextEditorStyle;
 using TokenType = HtmlToken::Type;
 using NodeType = HtmlNode::Type;
 
@@ -530,7 +529,7 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
         m_newListItem = true;
     } else if (tag == QStringLiteral("h1") || tag == QStringLiteral("h2") ||
                tag == QStringLiteral("h3") || tag == QStringLiteral("h4")) {
-        // Insert use new line for heading
+        // Start heading in a new block
         insertBlock();
 
         // Set heading level property
