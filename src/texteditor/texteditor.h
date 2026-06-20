@@ -105,7 +105,6 @@ private:
     void mergeFormatOnSelection(const QTextCharFormat &format, bool selectWord = false);
 
     // BlockFormat manipulation
-
     enum ScopePolicy {
         CurrentBlock,
         SelectedBlocks

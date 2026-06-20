@@ -479,8 +479,13 @@ void TextEditor::setHeadingCharFormat(const QTextBlock &block, int headingLevel)
 
     QTextCursor cursor(block);
     cursor.beginEditBlock();
+
+    // Handle existing fragments one-by-one
     applyFragmentChangesToBlock(block, headingFormatModifier);
+
+    // Change the block char format as a fallback for empty blocks
     cursor.setBlockCharFormat(headingFormatModifier(block, defaultCharFormat()));
+
     cursor.endEditBlock();
 }
 
@@ -562,6 +567,7 @@ void TextEditor::mergeFormatOnSelection(const QTextCharFormat &charFmt, bool sel
 
 void TextEditor::setBlockType(BlockType type, ScopePolicy policy, bool toggle)
 {
+    // ScopePolicy models the affected blocks in the document.
     if (policy == ScopePolicy::CurrentBlock) {
         setBlockTypeForBlock(textCursor().block(), type, toggle);
         return;
@@ -579,6 +585,8 @@ void TextEditor::setBlockType(BlockType type, ScopePolicy policy, bool toggle)
 
     BlockType newType;
     if (allOfType) {
+        // If toggle is true and all affected blocks already have the requested type,
+        // they are reset to Paragraph.
         if (!toggle)
             return;
         newType = BlockType::Paragraph;
@@ -596,7 +604,7 @@ void TextEditor::setBlockTypeForBlock(const QTextBlock &block, BlockType type, b
 {
     BlockType oldType = blockType(block);
     if (oldType == type) {
-        if (toggle)
+        if (toggle && oldType != BlockType::Paragraph)
             setBlockTypeForBlock(block, BlockType::Paragraph);
         return;
     }
@@ -623,8 +631,10 @@ void TextEditor::setBlockTypeForBlock(const QTextBlock &block, BlockType type, b
         break;
     }
     case BlockType::TextList: {
-        // Setup new list
+        // Create a QTextList object on the cursor.
         QTextList *textList = localCursor.createList(TopLevelListStyle);
+
+        // Attach the new QTextList object to a clean (default-based) block format.
         blockFmt.setObjectIndex(textList->objectIndex());
         break;
     }

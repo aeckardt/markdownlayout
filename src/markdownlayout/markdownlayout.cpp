@@ -160,7 +160,7 @@ void MarkdownLayout::ensureLayout()
         bool isBlockQuote = blockFmt.hasProperty(QTextFormat::BlockQuoteLevel);
 
         // QTextLine positions carry the visual indentation.
-        // The list marker is painted later into the indentation area by drawListItem().
+        // List markers are painted later into the indentation area by drawListItem().
         qreal textX = blockIndent(block);
         qreal availableWidth = docWidth - textX;
 
@@ -206,6 +206,8 @@ qreal MarkdownLayout::layoutBlockText(QTextLayout *layout, qreal lineX, qreal li
         if (!line.isValid())
             break;
 
+        // Shift the x-positions of QTextLine instead of QTextLayout.
+        // That is consistent with Qt's native cursor navigation.
         line.setLineWidth(lineWidth);
         line.setPosition(QPointF(lineX, y));
 
@@ -244,13 +246,12 @@ qreal MarkdownLayout::bottomPaddingForBlock(const QTextBlock &block) const
 }
 
 /*
- * Match Qt's internal indent model: the visual x-offset is the
+ * Match Qt's document indent model: the visual x-offset is the
  * sum of the block indent and the QTextListFormat indent, multiplied by
  * document()->indentWidth().
  *
  * List nesting is stored per block via QTextBlockFormat::indent().
- * QTextListFormat::indent() remains the list-wide base indent; normally it is 1
- * for top-level lists.
+ * QTextListFormat::indent() remains the list-wide base indent.
  */
 qreal MarkdownLayout::blockIndent(const QTextBlock &block) const
 {
@@ -393,7 +394,8 @@ void MarkdownLayout::drawTextCursorIfNeeded(QPainter *painter, const PaintContex
 
 // ---- Selection / hit-test helpers ---------------------------------
 
-QList<QTextLayout::FormatRange> MarkdownLayout::selectionsForBlock(const PaintContext &context, const QTextBlock &block) const
+QList<QTextLayout::FormatRange> MarkdownLayout::selectionsForBlock(const PaintContext &context,
+                                                                   const QTextBlock &block) const
 {
     QList<QTextLayout::FormatRange> ranges;
 
@@ -431,6 +433,7 @@ int MarkdownLayout::hitTestBlock(const QTextBlock &block, QPointF point, Qt::Hit
         QTextLine line = layout->lineAt(i);
         QRectF lineRect = line.rect().translated(layout->position());
         if (point.y() <= lineRect.bottom()) {
+            // Convert from document coordinates to QTextLayout coordinates.
             qreal localX = point.x() - layout->position().x();
             return block.position() + line.xToCursor(localX);
         }

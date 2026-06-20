@@ -517,10 +517,10 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
                 m_currentList = m_cursor->createList(TopLevelListStyle);
         }
 
-        // Set object index for block format
+        // Attach QTextList object to block format
         m_blockFmt.setObjectIndex(m_currentList->objectIndex());
 
-        // Set list style dependent on indent
+        // Store marker style as block-level layout metadata
         if (m_nestedUlTags > 1)
             m_blockFmt.setProperty(QTextFormat::ListStyle, LowerLevelListStyle);
         else
@@ -530,14 +530,21 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
         m_newListItem = true;
     } else if (tag == QStringLiteral("h1") || tag == QStringLiteral("h2") ||
                tag == QStringLiteral("h3") || tag == QStringLiteral("h4")) {
-        // Use new line for heading
+        // Insert use new line for heading
         insertBlock();
 
-        // Adjust charformat
+        // Set heading level property
         const int headingLevel = tag.at(1).digitValue();
         m_blockFmt.setHeadingLevel(headingLevel);
-        m_charFmt.setFontWeight(HeadingFontWeight);
-        m_charFmt.setProperty(QTextCharFormat::Property::FontSizeAdjustment, 4 - headingLevel);
+
+        // Adjust char format for new block
+        QTextCharFormat headingCharFmt;
+        headingCharFmt.setFontWeight(HeadingFontWeight);
+        headingCharFmt.setProperty(QTextCharFormat::Property::FontSizeAdjustment, 4 - headingLevel);
+        m_cursor->mergeBlockCharFormat(headingCharFmt);
+
+        // Use heading char format for next fragment(s)
+        m_charFmt.merge(headingCharFmt);
         fmtChanged = true;
     }
 
@@ -592,21 +599,20 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
 
 void HtmlRenderer::insertBlock()
 {
-    // The first addNewLine called shouldn't add another block
+    // The first insertBlock called shouldn't add another block
     // Therefore this guard is necessary
     if (m_atBeginning) {
         m_atBeginning = false;
         return;
     }
 
-    // Add new block
     m_cursor->insertBlock();
 
-    // Reset indent
+    // Reset block format
     m_indent = 0;
     m_blockFmt = QTextBlockFormat(defaultBlockFormat());
 
-    // Reset char format (now with default font size)
+    // Reset char format (with default font size)
     m_charFmt = QTextCharFormat(defaultCharFormat());
     m_cursor->setCharFormat(m_charFmt);
 }

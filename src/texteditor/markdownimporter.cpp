@@ -111,11 +111,20 @@ void MarkdownRenderer::renderBlocks(const QVector<MarkdownBlockToken> &tokens)
 
         // Apply block / char format changes
         switch (token.type) {
-        case TokenType::Heading:
+        case TokenType::Heading: {
+            // Set heading level property
             m_blockFmt.setHeadingLevel(token.level);
-            m_charFmt.setFontWeight(HeadingFontWeight);
-            m_charFmt.setProperty(QTextFormat::FontSizeAdjustment, 4 - token.level);
+
+            // Adjust char format for new block
+            QTextCharFormat headingCharFmt;
+            headingCharFmt.setFontWeight(HeadingFontWeight);
+            headingCharFmt.setProperty(QTextCharFormat::Property::FontSizeAdjustment, 4 - token.level);
+            m_cursor->mergeBlockCharFormat(headingCharFmt);
+
+            // Use heading char format for next fragment(s)
+            m_charFmt.merge(headingCharFmt);
             break;
+        }
         case TokenType::ListItem:
             if (!m_currentList) {
                 if (m_cursor->currentList())
