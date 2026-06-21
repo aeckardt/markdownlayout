@@ -30,7 +30,6 @@ SOURCES += \
 HEADERS += \
     src/texteditor/blocktypes.h \
     src/texteditor/gradientbutton.h \
-    src/texteditor/htmlimporter_p.h \
     src/texteditor/inlineformatresolver.h \
     src/texteditor/htmlexporter.h \
     src/texteditor/htmlimporter.h \
@@ -38,11 +37,9 @@ HEADERS += \
     src/texteditor/linkeditordialog.h \
     src/texteditor/markdownexporter.h \
     src/texteditor/markdownimporter.h \
-    src/texteditor/markdownimporter_p.h \
     src/texteditor/markdowninlineparser.h \
     src/texteditor/markdownlayout.h \
     src/texteditor/texteditor.h \
-    src/texteditor/texteditor_p.h \
     src/texteditor/texteditorstyle.h \
     src/texteditor/texteditorstyle_p.h \
     src/texteditor/texteditorwidget.h \

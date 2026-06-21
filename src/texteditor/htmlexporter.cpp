@@ -1,20 +1,49 @@
-#include "texteditor/htmlexporter.h"
-#include "texteditor/inlineformatresolver.h"
-#include "texteditor/texteditorstyle.h"
+#include "htmlexporter.h"
 
+#include "htmlstyle.h"
+#include "inlineformatresolver.h"
+#include "texteditorstyle.h"
+
+#include <QHash>
+#include <QString>
 #include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTextFormat>
+#include <QVector>
 #include <QTextList>
 
 using namespace Qt::StringLiterals;
 
-QString HtmlExporter::exportDocument(QTextDocument *document, const QTextCursor *range, bool skipHeader)
+class HtmlExporter
 {
-    HtmlExporter exporter(document, range, skipHeader);
-    return exporter.exportAll();
-}
+public:
+    HtmlExporter(QTextDocument *document, const QTextCursor *range, bool skipHeader);
+    QString exportAll();
+
+private:
+    QString exportBlock(const QTextBlock &block);
+    QString blockFormatToHtml(const QTextBlock &block, bool open);
+    QString inlineFormatToHtml(const struct ExportableFragment &fragment, bool open) const;
+
+    static QString htmlHeader();
+    static QString htmlFooter();
+
+    struct Tag {
+        QString name;
+        CssProperties attrs;
+
+        inline Tag(const QString &name, const CssProperties &attrs = {})
+            : name(name), attrs(attrs)
+        {}
+    };
+
+    QTextDocument *m_document;
+    int m_start;
+    int m_end;
+    bool m_skipHeader;
+    QVector<Tag> m_openTags;
+};
 
 HtmlExporter::HtmlExporter(QTextDocument *document, const QTextCursor *range, bool skipHeader)
     : m_document(document), m_skipHeader(skipHeader)
@@ -69,13 +98,23 @@ QString HtmlExporter::exportBlock(const QTextBlock &block)
     QString lineHtml = blockFormatToHtml(block, true);
 
     // Resolve char formats
-    const auto fragments = InlineFormatResolver(block, m_start, m_end).fragments();
+    auto fragments = InlineFormatResolver(block, m_start, m_end).fragments();
 
     // Process each fragment in the block
-    for (const auto &ef : fragments) {
+    for (auto &ef : fragments) {
         const auto fragment = ef.fragment;
         if (!fragment.isValid())
             break;
+
+        if (block.blockFormat().headingLevel() > 0) {
+            // The pointsize of headings is exclusively defined by their heading level.
+            // Therefore pointsize changes in headings are removed.
+            for (int i = ef.formatChanges.count() - 1; i >= 0; --i) {
+                const FormatChange &fc = ef.formatChanges.at(i);
+                if (fc.type == InlineFormat::PointSize)
+                    ef.formatChanges.removeAt(i);
+            }
+        }
 
         QString text = fragment.text();
 
@@ -87,9 +126,8 @@ QString HtmlExporter::exportBlock(const QTextBlock &block)
             sliceRight = std::max<int>(0, text.size() + remaining);
         const QString selectedText = text.mid(sliceLeft, sliceRight - sliceLeft);
 
-        // For non-heading blocks, wrap each fragment with its char format.
-        if (block.blockFormat().headingLevel() == 0)
-            lineHtml += inlineFormatToHtml(ef, true);
+        // Wrap each fragment with its char format.
+        lineHtml += inlineFormatToHtml(ef, true);
 
         // Add selected text within fragment
         lineHtml += selectedText.toHtmlEscaped();
@@ -220,20 +258,30 @@ QString HtmlExporter::inlineFormatToHtml(const ExportableFragment &fragment, boo
         if (open != change.open)
             continue;
         switch (change.type) {
-        case InlineFormat::Type::Link:
-            tags << (open ? QStringLiteral("<a href=\"%1\">").arg(change.attrs.value("href"_L1).toHtmlEscaped()) : "</a>"_L1);
+        case InlineFormat::Link:
+            tags << (open
+                     ? QStringLiteral("<a href=\"%1\">").arg(change.attrs.value("href"_L1).toHtmlEscaped())
+                     : "</a>"_L1);
             break;
-        case InlineFormat::Type::PointSize:
-            tags << (open ? QStringLiteral("<span style=\"font-size:%1pt\">").arg(change.attrs.value("font-size"_L1)) : "</span>"_L1);
+        case InlineFormat::PointSize:
+            tags << (open
+                     ? QStringLiteral("<span style=\"font-size:%1pt\">").arg(change.attrs.value("font-size"_L1))
+                     : "</span>"_L1);
             break;
-        case InlineFormat::Type::Bold:
-            tags << (open ? "<strong>"_L1 : "</strong>"_L1);
+        case InlineFormat::Bold:
+            tags << (open
+                     ? "<strong>"_L1
+                     : "</strong>"_L1);
             break;
-        case InlineFormat::Type::Italic:
-            tags << (open ? "<em>"_L1 : "</em>"_L1);
+        case InlineFormat::Italic:
+            tags << (open
+                     ? "<em>"_L1
+                     : "</em>"_L1);
             break;
-        case InlineFormat::Type::Underline:
-            tags << (open ? "<ins>"_L1 : "</ins>"_L1);
+        case InlineFormat::Underline:
+            tags << (open
+                     ? "<ins>"_L1
+                     : "</ins>"_L1);
             break;
         }
     }
@@ -259,4 +307,9 @@ QString HtmlExporter::htmlHeader()
 QString HtmlExporter::htmlFooter()
 {
     return QStringLiteral("</body>\n</html>");
+}
+
+QString htmlFromDocument(QTextDocument *document, const QTextCursor *range, bool skipHeader)
+{
+    return HtmlExporter(document, range, skipHeader).exportAll();
 }

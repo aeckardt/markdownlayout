@@ -86,6 +86,7 @@ void setBlockTypeForBlock(const QTextBlock &block, BlockType type, bool toggle)
     // Start from the default block format so switching a new block type clears old
     // block metadata such as list object index, quote level, or horizontal rule.
     QTextBlockFormat blockFmt(defaultBlockFormat());
+
     switch (type) {
     case BlockType::Heading1:
     case BlockType::Heading2:
@@ -98,7 +99,9 @@ void setBlockTypeForBlock(const QTextBlock &block, BlockType type, bool toggle)
     case BlockType::TextList: {
         // See if a QTextList object exists in the previous block
         const QTextBlock previousBlock = block.previous();
-        const QTextList *textList = previousBlock.textList();
+        const QTextList *textList = nullptr;
+        if (previousBlock.isValid())
+            textList = previousBlock.textList();
 
         // If not, create a new QTextList object on the cursor.
         if (!textList)
@@ -188,16 +191,16 @@ QTextCharFormat headingFormatModifier(int headingLevel, QTextCharFormat charFmt)
 void setHeadingCharFormat(const QTextBlock &block, int headingLevel)
 {
     QTextCursor localCursor(block);
-    localCursor.select(QTextCursor::BlockUnderCursor);
     localCursor.beginEditBlock();
-
-    // Handle existing fragments one-by-one
-    applyCharFormatModifier(localCursor, [&](const QTextBlock &, QTextCharFormat charFmt) {
-        return headingFormatModifier(headingLevel, charFmt);
-    });
 
     // Change the block char format as a fallback for empty blocks
     localCursor.setBlockCharFormat(headingFormatModifier(headingLevel, defaultCharFormat()));
+
+    // Handle existing fragments one-by-one
+    localCursor.select(QTextCursor::BlockUnderCursor);
+    applyCharFormatModifier(localCursor, [&](const QTextBlock &, QTextCharFormat charFmt) {
+        return headingFormatModifier(headingLevel, charFmt);
+    });
 
     localCursor.endEditBlock();
 }
@@ -221,7 +224,7 @@ void applyCharFormatModifier(const QTextCursor &cursor, const CharFormatModifier
 
     QVector<CharFormatUpdate> updates;
 
-    while (block.position() <= endPos && block.isValid()) {
+    while (block.isValid() && block.position() <= endPos) {
         QTextBlock::iterator it = block.begin();
         while (!it.atEnd()) {
             const QTextFragment fragment = it.fragment();

@@ -1,4 +1,4 @@
-#include "texteditor/markdowninlineparser.h"
+#include "markdowninlineparser.h"
 
 #include <QRegularExpression>
 #include <QTextDocumentFragment>
@@ -6,6 +6,9 @@
 
 #include <algorithm>
 #include <optional>
+
+using NodeType = InlineNode::Type;
+using MarkerType = ScopeMarker::Type;
 
 bool isPunctuation(const std::optional<QChar> &ch)
 {

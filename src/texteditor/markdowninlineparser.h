@@ -71,7 +71,7 @@ typedef std::shared_ptr<ScopeMarker> ScopeMarkerPtr;
  */
 class ScopeMarker {
 public:
-    enum class Type : int{
+    enum class Type : int {
         // The integer values are also their priority
         // Lower integer = higher binding priority when resolving the stack
         HtmlTag  = 0, // "<ins>", "<span>", ...
@@ -114,10 +114,10 @@ private:
 
     Type m_type;
 
-    // Invariant:
     // - HtmlTag          -> m_data points to InlineHtmlTag
     // - Bracket/Asterisk -> m_data points to DelimiterRun
     void *m_data;
+
     bool m_canOpen;
     bool m_canClose;
     InlineNodePtr m_node;
@@ -156,9 +156,6 @@ private:
     int m_pos = 0;
     int m_length = 0;
     QString m_text;
-
-    using NodeType = InlineNode::Type;
-    using MarkerType = ScopeMarker::Type;
 };
 
 #endif

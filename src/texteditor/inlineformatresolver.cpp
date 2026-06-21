@@ -1,5 +1,5 @@
-#include "texteditor/inlineformatresolver.h"
-#include "texteditor/texteditorstyle.h"
+#include "inlineformatresolver.h"
+#include "texteditorstyle.h"
 
 #include <algorithm>
 

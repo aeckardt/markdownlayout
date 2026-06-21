@@ -1,5 +1,4 @@
 #include "texteditor.h"
-#include "texteditor_p.h"
 
 #include "blocktypes.h"
 #include "htmlexporter.h"
@@ -31,6 +30,22 @@
 #include <QUrl>
 
 #include <algorithm>
+
+struct Hyperlink {
+    int position;
+    int length;
+    const QString text;
+    const QString href;
+
+    Hyperlink(int position, int length, const QString &text, const QString &href)
+        : position(position), length(length), text(text), href(href)
+    {}
+};
+
+typedef std::shared_ptr<Hyperlink> HyperlinkPtr;
+Q_DECLARE_METATYPE(HyperlinkPtr)
+
+void systemOpenFile(const QString &filename, const QString &dirPath = {});
 
 TextEditor::TextEditor(QWidget *parent)
     : QTextEdit(parent),
@@ -182,7 +197,7 @@ void TextEditor::copy()
     QTextCursor cursor = textCursor();
 
     // Export text as HTML
-    QString selectionAsHtml = HtmlExporter::exportDocument(document(), &cursor);
+    QString selectionAsHtml = htmlFromDocument(document(), &cursor);
     mimeData->setHtml(selectionAsHtml);
 
     // Export text as plain
@@ -200,7 +215,7 @@ void TextEditor::copyAsMarkdown()
     QMimeData *mimeData = new QMimeData;
 
     // Export text as Markdown
-    QString markdown = MarkdownExporter::exportDocument(document());
+    QString markdown = markdownFromDocument(document());
     mimeData->setText(markdown);
     mimeData->setData("text/markdown", markdown.toUtf8());
 
@@ -430,8 +445,6 @@ void TextEditor::mergeFormatOnSelection(const QTextCharFormat &charFmt, bool sel
 {
     QTextCursor cursor = textCursor();
 
-    // Begin edit block here
-    // Thus, there won't be two undo actions after this function
     cursor.beginEditBlock();
 
     // It could make sense to select the word (or the line) under the cursor
@@ -439,11 +452,9 @@ void TextEditor::mergeFormatOnSelection(const QTextCharFormat &charFmt, bool sel
     if (!cursor.hasSelection() && selectWord)
         cursor.select(QTextCursor::WordUnderCursor);
 
-    // Merge char format
     cursor.mergeCharFormat(charFmt);
     mergeCurrentCharFormat(charFmt);
 
-    // End edit block
     cursor.endEditBlock();
 }
 

@@ -1,6 +1,7 @@
-#include "texteditor/markdownexporter.h"
-#include "texteditor/inlineformatresolver.h"
-#include "texteditor/texteditorstyle.h"
+#include "markdownexporter.h"
+
+#include "inlineformatresolver.h"
+#include "texteditorstyle.h"
 
 #include <QRegularExpression>
 #include <QTextBlock>
@@ -8,21 +9,30 @@
 #include <QTextList>
 #include <QUrl>
 
-QString MarkdownExporter::exportDocument(QTextDocument *document, const QTextCursor *range)
+struct ExportableFragment;
+
+class MarkdownExporter
 {
-    return MarkdownExporter(document, range).exportAll();
-}
+public:
+    MarkdownExporter(QTextDocument *document, const QTextCursor *range);
+    QString exportAll();
+
+private:
+    QString exportBlock(const QTextBlock &block);
+    QPair<QString, int> exportFragment(const ExportableFragment &fragment,
+                                       int headingLevel = 0);
+
+    QTextDocument *m_document;
+    int m_start;
+    int m_end;
+};
 
 MarkdownExporter::MarkdownExporter(QTextDocument *document, const QTextCursor *range)
     : m_document(document)
 {
-    if (!document)
-        return;
-
     if (!range) {
         m_start = 0;
-        const QTextBlock last = document->lastBlock();
-        m_end = last.isValid() ? last.position() + last.length() : -1;
+        m_end = document->characterCount() - 1;
     } else {
         m_start = range->selectionStart();
         m_end = range->selectionEnd();
@@ -43,6 +53,7 @@ QString MarkdownExporter::exportAll()
         lines << exportBlock(block);
         block = block.next();
     }
+
     return lines.join(QLatin1Char('\n'));
 }
 
@@ -66,11 +77,11 @@ QString MarkdownExporter::exportBlock(const QTextBlock &block)
     const auto fragments = InlineFormatResolver(block, m_start, m_end).fragments();
     QString lineText;
 
-    for (const auto &fragment : fragments) {
-        if (!fragment.fragment.isValid())
+    for (const auto &ef : fragments) {
+        if (!ef.fragment.isValid())
             break;
 
-        const auto exported = exportFragment(fragment, headingLevel);
+        const auto exported = exportFragment(ef, headingLevel);
         lineText += exported.first;
         if (exported.second <= 0)
             break;
@@ -117,6 +128,7 @@ QPair<QString, int> MarkdownExporter::exportFragment(const ExportableFragment &e
             break;
         case InlineFormat::PointSize:
             if (headingLevel > 0)
+                // Heading size is exclusively represented by the heading block type.
                 break;
             if (change.open)
                 opening << QStringLiteral("<span style=\"font-size:%1pt\">").arg(change.attrs.value(QStringLiteral("font-size")));
@@ -135,4 +147,9 @@ QPair<QString, int> MarkdownExporter::exportFragment(const ExportableFragment &e
     }
 
     return {leading + opening.join(QString()) + core + closing.join(QString()) + trailing, remaining};
+}
+
+QString markdownFromDocument(QTextDocument *document, const QTextCursor *range)
+{
+    return MarkdownExporter(document, range).exportAll();
 }
