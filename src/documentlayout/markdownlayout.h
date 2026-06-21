@@ -9,7 +9,7 @@ class LayoutMetrics
 public:
     qreal fallbackWidth = 760.0;
     qreal paragraphSpacing = 4.0;
-    qreal listBulletLeftMargin = 7.0;
+    qreal listBulletLeftMargin = 9.0;
     qreal blockPaddingX = 12.0;
     qreal blockPaddingY = 8.0;
     qreal quoteBarWidth = 4.0;

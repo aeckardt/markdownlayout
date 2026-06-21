@@ -17,7 +17,7 @@ class QTextLength;
  * normal constants or functions.
  *
  * Optional style values are controlled through preprocessor macros in
- * texteditorstyle_config.h. Removing such a macro means that the corresponding
+ * configdefs_p.h. Removing such a macro means that the corresponding
  * formatting step is not compiled at all.
  *
  * Rule of thumb:
@@ -43,10 +43,10 @@ const QColor &linkColor();
 const QTextLength &horizontalRulerWidth();
 const QColor &horizontalRulerColor();
 
-// Default block format for TextEditor
+// Default block format for editor
 const QTextBlockFormat &defaultBlockFormat();
 
-// Default char format for TextEditor
+// Default char format for editor
 // Needs to be initialized after QGuiApplication starts running
 const QTextCharFormat &defaultCharFormat();
 int defaultFontPointSize();
