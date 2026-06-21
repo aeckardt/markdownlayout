@@ -10,32 +10,31 @@ QMAKE_CXXFLAGS += -fmessage-length=0
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
-    src/texteditor/blocktypes.cpp \
-    src/texteditor/inlineformatresolver.cpp \
-    src/texteditor/htmlexporter.cpp \
-    src/texteditor/htmlimporter.cpp \
-    src/texteditor/htmlstyle.cpp \
-    src/texteditor/markdownexporter.cpp \
-    src/texteditor/markdownimporter.cpp \
-    src/texteditor/markdowninlineparser.cpp \
-    src/texteditor/texteditorstyle.cpp \
+    src/serialization/htmlimporter.cpp \
+    src/serialization/htmlstyle.cpp \
+    src/serialization/htmlwriter.cpp \
+    src/serialization/inlineformatresolver.cpp \
+    src/serialization/markdownimporter.cpp \
+    src/serialization/markdowninlineparser.cpp \
+    src/serialization/markdownwriter.cpp \
+    src/textformat/blocktypes.cpp \
+    src/textformat/constdefs.cpp \
     src/parsertests_main.cpp
 
 HEADERS += \
-    src/texteditor/blocktypes.h \
-    src/texteditor/inlineformatresolver.h \
-    src/texteditor/htmlexporter.h \
-    src/texteditor/htmlimporter.h \
-    src/texteditor/htmlstyle.h \
-    src/texteditor/markdownexporter.h \
-    src/texteditor/markdownimporter.h \
-    src/texteditor/markdowninlineparser.h \
-    src/texteditor/texteditorstyle.h \
-    src/texteditor/texteditorstyle_p.h
+    src/textformat/blocktypes.h \
+    src/serialization/htmlimporter.h \
+    src/serialization/htmlstyle.h \
+    src/serialization/htmlwriter.h \
+    src/serialization/inlineformatresolver.h \
+    src/serialization/markdownimporter.h \
+    src/serialization/markdowninlineparser.h \
+    src/serialization/markdownwriter.h \
+    src/textformat/constdefs.h \
+    src/textformat/constdefs_p.h
 
 INCLUDEPATH += \
-    src \
-    src/texteditor
+    src
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
