@@ -44,18 +44,18 @@ int main(int argc, char **argv)
     QApplication app(argc, argv);
 
     // Round trip test
-    QTextDocument *document1 = documentFromMarkdown(markdownString, &app);
-    QString exportedHtml = HtmlExporter::exportDocument(document1);
-    QTextDocument *document2 = documentFromHtml(exportedHtml, &app);
-    QString exportedMd = MarkdownExporter::exportDocument(document2);
+    QTextDocument *doc1 = documentFromMarkdown(markdownString, &app);
+    QString exportedHtml = htmlFromDocument(doc1);
+    QTextDocument *doc2 = documentFromHtml(exportedHtml, &app);
+    QString exportedMd = markdownFromDocument(doc2);
 
-    // Is the original data preserved even with double conversion?
-    Q_ASSERT(document1->toHtml() == document2->toHtml());
+    // Is the original data preserved even after double conversion?
+    Q_ASSERT(doc1->toHtml() == doc2->toHtml());
     Q_ASSERT(markdownString == exportedMd);
 
     // Show created document in window
     MainWindow wnd;
-    wnd.setDocument(document2);
+    wnd.setDocument(doc2);
     wnd.show();
 
     return app.exec();

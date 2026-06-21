@@ -10,6 +10,7 @@ QMAKE_CXXFLAGS += -fmessage-length=0
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    src/texteditor/blocktypes.cpp \
     src/texteditor/inlineformatresolver.cpp \
     src/texteditor/htmlexporter.cpp \
     src/texteditor/htmlimporter.cpp \
@@ -21,6 +22,7 @@ SOURCES += \
     src/parsertests_main.cpp
 
 HEADERS += \
+    src/texteditor/blocktypes.h \
     src/texteditor/htmlimporter_p.h \
     src/texteditor/inlineformatresolver.h \
     src/texteditor/htmlexporter.h \

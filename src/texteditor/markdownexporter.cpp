@@ -32,7 +32,7 @@ MarkdownExporter::MarkdownExporter(QTextDocument *document, const QTextCursor *r
 {
     if (!range) {
         m_start = 0;
-        m_end = document->characterCount() - 1;
+        m_end = document->characterCount();
     } else {
         m_start = range->selectionStart();
         m_end = range->selectionEnd();
