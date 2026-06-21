@@ -1,8 +1,8 @@
-#include "htmlexporter.h"
+#include "htmlwriter.h"
 
 #include "htmlstyle.h"
 #include "inlineformatresolver.h"
-#include "texteditorstyle.h"
+#include "textformat/constdefs.h"
 
 #include <QHash>
 #include <QString>
@@ -15,10 +15,10 @@
 
 using namespace Qt::StringLiterals;
 
-class HtmlExporter
+class HtmlWriter
 {
 public:
-    HtmlExporter(QTextDocument *document, const QTextCursor *range, bool skipHeader);
+    HtmlWriter(QTextDocument *document, const QTextCursor *range, bool skipHeader);
     QString exportAll();
 
 private:
@@ -45,7 +45,7 @@ private:
     QVector<Tag> m_openTags;
 };
 
-HtmlExporter::HtmlExporter(QTextDocument *document, const QTextCursor *range, bool skipHeader)
+HtmlWriter::HtmlWriter(QTextDocument *document, const QTextCursor *range, bool skipHeader)
     : m_document(document), m_skipHeader(skipHeader)
 {
     Q_ASSERT(document);
@@ -59,7 +59,7 @@ HtmlExporter::HtmlExporter(QTextDocument *document, const QTextCursor *range, bo
     }
 }
 
-QString HtmlExporter::exportAll()
+QString HtmlWriter::exportAll()
 {
     if (m_end < m_start)
         return "";
@@ -92,7 +92,7 @@ QString HtmlExporter::exportAll()
     return htmlOutput;
 }
 
-QString HtmlExporter::exportBlock(const QTextBlock &block)
+QString HtmlWriter::exportBlock(const QTextBlock &block)
 {
     // Open the block (generate starting HTML for the block)
     QString lineHtml = blockFormatToHtml(block, true);
@@ -150,7 +150,7 @@ QString HtmlExporter::exportBlock(const QTextBlock &block)
  * Uses the open_tags stack to track which tags are open.
  * Uses inline CSS to represent indent via margin-left.
 */
-QString HtmlExporter::blockFormatToHtml(const QTextBlock &block, bool open)
+QString HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
 {
     const QTextBlockFormat blockFormat = block.blockFormat();
     const int indent = blockFormat.indent();
@@ -251,7 +251,7 @@ QString HtmlExporter::blockFormatToHtml(const QTextBlock &block, bool open)
     return output;
 }
 
-QString HtmlExporter::inlineFormatToHtml(const ExportableFragment &fragment, bool open) const
+QString HtmlWriter::inlineFormatToHtml(const ExportableFragment &fragment, bool open) const
 {
     QStringList tags;
     for (const auto &change : fragment.formatChanges) {
@@ -288,7 +288,7 @@ QString HtmlExporter::inlineFormatToHtml(const ExportableFragment &fragment, boo
     return tags.join(QString());
 }
 
-QString HtmlExporter::htmlHeader()
+QString HtmlWriter::htmlHeader()
 {
     return QStringLiteral(
         "<!DOCTYPE html>\n"
@@ -304,12 +304,12 @@ QString HtmlExporter::htmlHeader()
         "<body>\n");
 }
 
-QString HtmlExporter::htmlFooter()
+QString HtmlWriter::htmlFooter()
 {
     return QStringLiteral("</body>\n</html>");
 }
 
 QString htmlFromDocument(QTextDocument *document, const QTextCursor *range, bool skipHeader)
 {
-    return HtmlExporter(document, range, skipHeader).exportAll();
+    return HtmlWriter(document, range, skipHeader).exportAll();
 }

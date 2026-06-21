@@ -1,13 +1,13 @@
 #include "texteditor.h"
 
-#include "blocktypes.h"
-#include "htmlexporter.h"
-#include "htmlimporter.h"
-#include "markdownexporter.h"
-#include "markdownimporter.h"
-#include "linkeditordialog.h"
-#include "texteditorstyle.h"
-#include "texteditorstyle_p.h"
+#include "dialogs/linkeditordialog.h"
+#include "serialization/htmlwriter.h"
+#include "serialization/htmlimporter.h"
+#include "serialization/markdownwriter.h"
+#include "serialization/markdownimporter.h"
+#include "textformat/blocktypes.h"
+#include "textformat/constdefs.h"
+#include "textformat/constdefs_p.h"
 
 #include <QAction>
 #include <QClipboard>

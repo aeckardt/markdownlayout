@@ -1,12 +1,12 @@
-#ifndef TEXTEDITORSTYLE_P_H
-#define TEXTEDITORSTYLE_P_H
+#ifndef CONSTDEFS_P_H
+#define CONSTDEFS_P_H
 
 // Modifiable style constants
 
-// TextEditor styles (do not remove)
+// Editor styles (do not remove)
 #define LINK_COLOR   "#1c37e5"
 
-// Optional TextEditor styles (remove to deactivate)
+// Optional Editor styles (remove to deactivate)
 #define DOCUMENT_INDENT_WIDTH  25
 #define VIEWPORT_MARGIN        15
 
@@ -16,4 +16,4 @@
 #define HORIZONTAL_RULER_WIDTH "50%"
 #define HORIZONTAL_RULER_COLOR "#999"
 
-#endif // TEXTEDITORSTYLE_P_H
+#endif // CONSTDEFS_P_H

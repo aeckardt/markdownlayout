@@ -1,5 +1,5 @@
-#ifndef MARKDOWNEXPORTER_H
-#define MARKDOWNEXPORTER_H
+#ifndef MARKDOWNWRITER_H
+#define MARKDOWNWRITER_H
 
 class QString;
 class QTextCursor;

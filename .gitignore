@@ -3,3 +3,4 @@ build
 *.pro.user
 pyqt6_demo
 .vscode
+qtextdocumentlayout

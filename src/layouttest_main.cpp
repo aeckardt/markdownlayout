@@ -5,11 +5,11 @@
 #include <QTextEdit>
 #include <QTextDocument>
 
-#include "texteditor/htmlexporter.h"
-#include "texteditor/htmlimporter.h"
-#include "texteditor/markdownexporter.h"
-#include "texteditor/markdownimporter.h"
-#include "texteditor/markdownlayout.h"
+#include "documentlayout/markdownlayout.h"
+#include "serialization/htmlwriter.h"
+#include "serialization/htmlimporter.h"
+#include "serialization/markdownwriter.h"
+#include "serialization/markdownimporter.h"
 #include "texteditor/texteditor.h"
 #include "texteditor/texteditorwidget.h"
 

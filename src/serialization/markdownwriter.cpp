@@ -1,7 +1,7 @@
-#include "markdownexporter.h"
+#include "markdownwriter.h"
 
 #include "inlineformatresolver.h"
-#include "texteditorstyle.h"
+#include "textformat/constdefs.h"
 
 #include <QRegularExpression>
 #include <QTextBlock>
@@ -11,10 +11,10 @@
 
 struct ExportableFragment;
 
-class MarkdownExporter
+class MarkdownWriter
 {
 public:
-    MarkdownExporter(QTextDocument *document, const QTextCursor *range);
+    MarkdownWriter(QTextDocument *document, const QTextCursor *range);
     QString exportAll();
 
 private:
@@ -27,7 +27,7 @@ private:
     int m_end;
 };
 
-MarkdownExporter::MarkdownExporter(QTextDocument *document, const QTextCursor *range)
+MarkdownWriter::MarkdownWriter(QTextDocument *document, const QTextCursor *range)
     : m_document(document)
 {
     if (!range) {
@@ -39,7 +39,7 @@ MarkdownExporter::MarkdownExporter(QTextDocument *document, const QTextCursor *r
     }
 }
 
-QString MarkdownExporter::exportAll()
+QString MarkdownWriter::exportAll()
 {
     if (!m_document || m_end < m_start)
         return {};
@@ -57,7 +57,7 @@ QString MarkdownExporter::exportAll()
     return lines.join(QLatin1Char('\n'));
 }
 
-QString MarkdownExporter::exportBlock(const QTextBlock &block)
+QString MarkdownWriter::exportBlock(const QTextBlock &block)
 {
     const QTextBlockFormat blockFormat = block.blockFormat();
     const int headingLevel = blockFormat.headingLevel();
@@ -90,7 +90,7 @@ QString MarkdownExporter::exportBlock(const QTextBlock &block)
     return prefix + lineText;
 }
 
-QPair<QString, int> MarkdownExporter::exportFragment(const ExportableFragment &ef,
+QPair<QString, int> MarkdownWriter::exportFragment(const ExportableFragment &ef,
                                                      int headingLevel)
 {
     const auto fragment = ef.fragment;
@@ -151,5 +151,5 @@ QPair<QString, int> MarkdownExporter::exportFragment(const ExportableFragment &e
 
 QString markdownFromDocument(QTextDocument *document, const QTextCursor *range)
 {
-    return MarkdownExporter(document, range).exportAll();
+    return MarkdownWriter(document, range).exportAll();
 }

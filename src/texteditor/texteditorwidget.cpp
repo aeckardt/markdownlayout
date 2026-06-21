@@ -1,10 +1,10 @@
 #include "texteditorwidget.h"
 
-#include "blocktypes.h"
-#include "gradientbutton.h"
 #include "texteditor.h"
-#include "texteditorstyle.h"
-#include "toolbarseparator.h"
+#include "textformat/blocktypes.h"
+#include "textformat/constdefs.h"
+#include "widgets/gradientbutton.h"
+#include "widgets/toolbarseparator.h"
 
 #include <QBoxLayout>
 #include <QComboBox>

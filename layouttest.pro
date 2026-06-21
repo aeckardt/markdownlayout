@@ -11,43 +11,42 @@ QMAKE_CXXFLAGS += -fmessage-length=0
 
 SOURCES += \
     src/layouttest_main.cpp \
-    src/texteditor/blocktypes.cpp \
-    src/texteditor/gradientbutton.cpp \
-    src/texteditor/inlineformatresolver.cpp \
-    src/texteditor/htmlexporter.cpp \
-    src/texteditor/htmlimporter.cpp \
-    src/texteditor/htmlstyle.cpp \
-    src/texteditor/linkeditordialog.cpp \
-    src/texteditor/markdownexporter.cpp \
-    src/texteditor/markdownimporter.cpp \
-    src/texteditor/markdowninlineparser.cpp \
-    src/texteditor/markdownlayout.cpp \
+    src/dialogs/linkeditordialog.cpp \
+    src/documentlayout/markdownlayout.cpp \
+    src/serialization/htmlwriter.cpp \
+    src/serialization/inlineformatresolver.cpp \
+    src/serialization/htmlimporter.cpp \
+    src/serialization/htmlstyle.cpp \
+    src/serialization/markdownimporter.cpp \
+    src/serialization/markdowninlineparser.cpp \
+    src/serialization/markdownwriter.cpp \
     src/texteditor/texteditor.cpp \
-    src/texteditor/texteditorstyle.cpp \
+    src/textformat/blocktypes.cpp \
+    src/textformat/constdefs.cpp \
     src/texteditor/texteditorwidget.cpp \
-    src/texteditor/toolbarseparator.cpp
+    src/widgets/gradientbutton.cpp \
+    src/widgets/toolbarseparator.cpp
 
 HEADERS += \
-    src/texteditor/blocktypes.h \
-    src/texteditor/gradientbutton.h \
-    src/texteditor/inlineformatresolver.h \
-    src/texteditor/htmlexporter.h \
-    src/texteditor/htmlimporter.h \
-    src/texteditor/htmlstyle.h \
-    src/texteditor/linkeditordialog.h \
-    src/texteditor/markdownexporter.h \
-    src/texteditor/markdownimporter.h \
-    src/texteditor/markdowninlineparser.h \
-    src/texteditor/markdownlayout.h \
+    src/dialogs/linkeditordialog.h \
+    src/documentlayout/markdownlayout.h \
+    src/serialization/htmlwriter.h \
+    src/serialization/inlineformatresolver.h \
+    src/serialization/htmlimporter.h \
+    src/serialization/htmlstyle.h \
+    src/serialization/markdownimporter.h \
+    src/serialization/markdowninlineparser.h \
+    src/serialization/markdownwriter.h \
     src/texteditor/texteditor.h \
-    src/texteditor/texteditorstyle.h \
-    src/texteditor/texteditorstyle_p.h \
     src/texteditor/texteditorwidget.h \
-    src/texteditor/toolbarseparator.h
+    src/textformat/blocktypes.h \
+    src/textformat/constdefs.h \
+    src/textformat/constdefs_p.h \
+    src/widgets/gradientbutton.h \
+    src/widgets/toolbarseparator.h
 
 INCLUDEPATH += \
-    src \
-    src/texteditor
+    src
 
 OTHER_FILES += \
     README.md \

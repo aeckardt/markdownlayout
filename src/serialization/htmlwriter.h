@@ -1,5 +1,5 @@
-#ifndef HTMLEXPORTER_H
-#define HTMLEXPORTER_H
+#ifndef HTMLWRITER_H
+#define HTMLWRITER_H
 
 class QString;
 class QTextDocument;

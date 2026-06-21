@@ -1,4 +1,4 @@
-#include "texteditor/htmlstyle.h"
+#include "htmlstyle.h"
 
 #include <QFont>
 #include <QHash>

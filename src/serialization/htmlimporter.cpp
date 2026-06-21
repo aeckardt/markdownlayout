@@ -1,8 +1,8 @@
 #include "htmlimporter.h"
 
-#include "blocktypes.h"
 #include "htmlstyle.h"
-#include "texteditorstyle.h"
+#include "textformat/blocktypes.h"
+#include "textformat/constdefs.h"
 
 #include <QHash>
 #include <QRegularExpression>
@@ -775,5 +775,6 @@ QTextDocument *documentFromHtml(const QString &html, QObject *parent)
         // Create bodyNode as root for parsing
         bodyNode = HtmlNode::makeElement("body", {}, nodes);
 
+    // Render AST onto QTextDocument
     return HtmlRenderer::createDocument(bodyNode, context, parent);
 }

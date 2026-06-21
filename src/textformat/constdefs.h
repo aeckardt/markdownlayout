@@ -1,5 +1,5 @@
-#ifndef TEXTEDITORSTYLE_H
-#define TEXTEDITORSTYLE_H
+#ifndef CONSTDEFS_H
+#define CONSTDEFS_H
 
 #include <QFont>
 #include <QTextListFormat>
@@ -11,7 +11,7 @@ class QTextCharFormat;
 class QTextLength;
 
 /*
- * Style configuration:
+ * Editor style constants:
  *
  * Some style values are always part of the editor model and are exposed as
  * normal constants or functions.
@@ -24,7 +24,7 @@ class QTextLength;
  * - If a style sets a concrete Qt property at exactly one call site,
  * use #ifdef directly at that call site.
  * - If a style is translated into a reusable Qt format object,
- * keep the #ifdef inside TextEditorStyle's helper function.
+ * keep the #ifdef inside a helper function.
  * - If a value is always available and not optional,
  * use a normal constant or function instead of a macro.
 */
@@ -55,4 +55,4 @@ int defaultFontPointSize();
 bool isStrong(const QTextCharFormat &charFormat);
 QFont::Weight blockDefaultFontWeight(const QTextBlock &block);
 
-#endif
+#endif // CONSTDEFS_H

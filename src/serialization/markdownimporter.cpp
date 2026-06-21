@@ -1,9 +1,9 @@
 #include "markdownimporter.h"
 
-#include "blocktypes.h"
 #include "htmlstyle.h"
 #include "markdowninlineparser.h"
-#include "texteditorstyle.h"
+#include "textformat/blocktypes.h"
+#include "textformat/constdefs.h"
 
 #include <QRegularExpression>
 #include <QTextBlockFormat>
