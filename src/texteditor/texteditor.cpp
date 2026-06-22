@@ -7,7 +7,6 @@
 #include "serialization/markdownimporter.h"
 #include "textformat/blocktypes.h"
 #include "textformat/constdefs.h"
-#include "textformat/constdefs_p.h"
 
 #include <QAction>
 #include <QClipboard>
@@ -30,6 +29,10 @@
 #include <QUrl>
 
 #include <algorithm>
+
+// Modifiable style constants (remove to deactivate)
+#define DOCUMENT_INDENT_WIDTH 25
+#define VIEWPORT_MARGIN       15
 
 struct Hyperlink {
     int position;

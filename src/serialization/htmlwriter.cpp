@@ -132,9 +132,8 @@ QString HtmlWriter::exportBlock(const QTextBlock &block)
         // Add selected text within fragment
         lineHtml += selectedText.toHtmlEscaped();
 
-        // For non-heading blocks, close formatting tags
-        if (block.blockFormat().headingLevel() == 0)
-            lineHtml += inlineFormatToHtml(ef, false);
+        // Close formatting tags
+        lineHtml += inlineFormatToHtml(ef, false);
 
         if (remaining <= 0)
             break;

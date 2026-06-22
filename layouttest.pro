@@ -22,8 +22,8 @@ SOURCES += \
     src/serialization/markdownwriter.cpp \
     src/texteditor/texteditor.cpp \
     src/textformat/blocktypes.cpp \
-    src/textformat/constdefs.cpp \
     src/texteditor/texteditorwidget.cpp \
+    src/textformat/constdefs.cpp \
     src/widgets/gradientbutton.cpp \
     src/widgets/toolbarseparator.cpp
 
@@ -41,7 +41,6 @@ HEADERS += \
     src/texteditor/texteditorwidget.h \
     src/textformat/blocktypes.h \
     src/textformat/constdefs.h \
-    src/textformat/constdefs_p.h \
     src/widgets/gradientbutton.h \
     src/widgets/toolbarseparator.h
 

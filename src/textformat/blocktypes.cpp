@@ -1,7 +1,6 @@
 #include "blocktypes.h"
 
 #include "constdefs.h"
-#include "constdefs_p.h"
 
 #include <QTextBlock>
 #include <QTextCharFormat>
@@ -120,9 +119,8 @@ void setBlockTypeForBlock(const QTextBlock &block, BlockType type, bool toggle)
         localCursor.removeSelectedText();
 
         blockFmt.setProperty(QTextFormat::BlockTrailingHorizontalRulerWidth, horizontalRulerWidth());
-#ifdef HORIZONTAL_RULER_COLOR
-        blockFmt.setProperty(QTextFormat::BackgroundBrush, horizontalRulerColor());
-#endif
+        if (horizontalRulerColor().isValid())
+            blockFmt.setProperty(QTextFormat::BackgroundBrush, horizontalRulerColor());
 
         break;
     default:

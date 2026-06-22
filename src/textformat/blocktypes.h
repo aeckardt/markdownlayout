@@ -1,6 +1,7 @@
 #ifndef BLOCKTYPES_H
 #define BLOCKTYPES_H
 
+#include <QFont>
 #include <QVector>
 #include <functional>
 

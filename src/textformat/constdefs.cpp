@@ -1,10 +1,19 @@
 #include "constdefs.h"
-#include "constdefs_p.h"
 
 #include <QGuiApplication>
 #include <QTextBlock>
 #include <QTextBlockFormat>
 #include <QTextCharFormat>
+
+// Definition of constants
+#define LINK_COLOR             "#1c37e5"
+
+// Optional (remove to deactivate)
+#define BLOCK_LINE_HEIGHT      "125%"
+#define BLOCK_TOP_MARGIN       0
+#define BLOCK_BOTTOM_MARGIN    2
+#define HORIZONTAL_RULER_WIDTH "50%"
+#define HORIZONTAL_RULER_COLOR "#999"
 
 const QColor &linkColor()
 {
@@ -147,9 +156,6 @@ bool isStrong(const QTextCharFormat &charFormat)
     return charFormat.fontWeight() >= StrongFontWeight;
 }
 
-/*
- * Return the default font weight for the block's semantic type.
- */
 QFont::Weight blockDefaultFontWeight(const QTextBlock &block)
 {
     if (block.blockFormat().headingLevel() > 0)
