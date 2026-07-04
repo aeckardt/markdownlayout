@@ -1,5 +1,14 @@
 # Third-Party Notices
 
+## MD4C
+
+This project contains the MD4C Markdown parser.
+
+- Copyright: Martin Mitáš
+- Source: https://github.com/mity/md4c
+- License: MIT License
+- License URL: https://mit-license.org
+
 ## Font Awesome Free
 
 This project includes third-party icon assets.

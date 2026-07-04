@@ -6,21 +6,23 @@
 #include <QTextDocument>
 
 #include "documentlayout/markdownlayout.h"
-#include "serialization/htmlwriter.h"
-#include "serialization/htmlimporter.h"
-#include "serialization/markdownwriter.h"
-#include "serialization/markdownimporter.h"
+#include "io/htmlwriter.h"
+#include "io/htmlimporter.h"
+#include "io/markdownwriter.h"
+#include "io/markdownimporter.h"
 #include "texteditor/texteditor.h"
 #include "texteditor/texteditorwidget.h"
 
 #define USE_MARKDOWN_LAYOUT
 
 static const char *markdownString =
-        "# 1. Überschrift\n"
+        "# 1. Überschrift\n\n"
         "* Listenpunkt 1\n"
         "* Listenpunkt 2\n"
+        "  - eingerückter Listenpunkt mit Dash\n"
+        "* Listenpunkt 3\n"
         "\n"
-        "## 2. Überschrift\n"
+        "## 2. Überschrift\n\n"
         "Etwas **fetter** und etwas *kursiver* Text.\n"
         "\n"
         "> Ein Zitat in einem BlockQuote.\n"

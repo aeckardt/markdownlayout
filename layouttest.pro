@@ -10,33 +10,33 @@ QMAKE_CXXFLAGS += -fmessage-length=0
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
-    src/layouttest_main.cpp \
+    src/3rdparty/md4c/md4c.c \
     src/dialogs/linkeditordialog.cpp \
     src/documentlayout/markdownlayout.cpp \
-    src/serialization/htmlwriter.cpp \
-    src/serialization/inlineformatresolver.cpp \
-    src/serialization/htmlimporter.cpp \
-    src/serialization/htmlstyle.cpp \
-    src/serialization/markdownimporter.cpp \
-    src/serialization/markdowninlineparser.cpp \
-    src/serialization/markdownwriter.cpp \
+    src/io/htmlwriter.cpp \
+    src/io/inlineformatresolver.cpp \
+    src/io/htmlimporter.cpp \
+    src/io/htmlstyle.cpp \
+    src/io/markdownimporter.cpp \
+    src/io/markdownwriter.cpp \
     src/texteditor/texteditor.cpp \
     src/textformat/blocktypes.cpp \
     src/texteditor/texteditorwidget.cpp \
     src/textformat/constdefs.cpp \
     src/widgets/gradientbutton.cpp \
-    src/widgets/toolbarseparator.cpp
+    src/widgets/toolbarseparator.cpp \
+    src/layouttest_main.cpp
 
 HEADERS += \
+    src/3rdparty/md4c/md4c.h \
     src/dialogs/linkeditordialog.h \
     src/documentlayout/markdownlayout.h \
-    src/serialization/htmlwriter.h \
-    src/serialization/inlineformatresolver.h \
-    src/serialization/htmlimporter.h \
-    src/serialization/htmlstyle.h \
-    src/serialization/markdownimporter.h \
-    src/serialization/markdowninlineparser.h \
-    src/serialization/markdownwriter.h \
+    src/io/htmlwriter.h \
+    src/io/inlineformatresolver.h \
+    src/io/htmlimporter.h \
+    src/io/htmlstyle.h \
+    src/io/markdownimporter.h \
+    src/io/markdownwriter.h \
     src/texteditor/texteditor.h \
     src/texteditor/texteditorwidget.h \
     src/textformat/blocktypes.h \
@@ -49,7 +49,8 @@ INCLUDEPATH += \
 
 OTHER_FILES += \
     README.md \
-    THIRD_PARTY_NOTICES.md
+    THIRD_PARTY_NOTICES.md \
+    .gitignore
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

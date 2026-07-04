@@ -1,10 +1,10 @@
 #include "texteditor.h"
 
 #include "dialogs/linkeditordialog.h"
-#include "serialization/htmlwriter.h"
-#include "serialization/htmlimporter.h"
-#include "serialization/markdownwriter.h"
-#include "serialization/markdownimporter.h"
+#include "io/htmlwriter.h"
+#include "io/htmlimporter.h"
+#include "io/markdownwriter.h"
+#include "io/markdownimporter.h"
 #include "textformat/blocktypes.h"
 #include "textformat/constdefs.h"
 
@@ -498,12 +498,6 @@ void TextEditor::adjustListIndentationForBlock(const QTextBlock &block, int delt
 
     // Nesting is stored per list item as QTextBlockFormat::indent().
     blockFmt.setIndent(newIndent);
-
-    // Setting the ListStyle property for QTextBlockFormat
-    // overrides the QTextListFormat::Style
-    blockFmt.setProperty(QTextFormat::ListStyle, newIndent > 0
-                         ? LowerLevelListStyle
-                         : TopLevelListStyle);
 
     QTextCursor blockCursor(block);
     blockCursor.setBlockFormat(blockFmt);

@@ -18,6 +18,8 @@
 
 #include <memory>
 
+using namespace Qt::StringLiterals;
+
 struct HtmlToken {
     enum class Type {
         StartTag,
@@ -161,24 +163,23 @@ static void appendCodePoint(QString &out, uint codePoint)
 static QString htmlUnescape(const QString &text)
 {
     static const QHash<QString, QString> namedEntities = {
-        {QStringLiteral("amp"),  QStringLiteral("&")},
-        {QStringLiteral("lt"),   QStringLiteral("<")},
-        {QStringLiteral("gt"),   QStringLiteral(">")},
-        {QStringLiteral("quot"), QStringLiteral("\"")},
-        {QStringLiteral("apos"), QStringLiteral("'")},
-        {QStringLiteral("nbsp"), QString(QChar(0x00A0))},
+        {"amp"_L1,  "&"_L1},
+        {"lt"_L1,   "<"_L1},
+        {"gt"_L1,   ">"_L1},
+        {"quot"_L1, "\""_L1},
+        {"apos"_L1, "'"_L1},
+        {"nbsp"_L1, QString(QChar(0x00A0))},
 
         // Optional common extras:
-        {QStringLiteral("ndash"), QString(QChar(0x2013))},
-        {QStringLiteral("mdash"), QString(QChar(0x2014))},
-        {QStringLiteral("hellip"), QString(QChar(0x2026))}
+        {"ndash"_L1, QString(QChar(0x2013))},
+        {"mdash"_L1, QString(QChar(0x2014))},
+        {"hellip"_L1, QString(QChar(0x2026))}
     };
 
     QString out;
     out.reserve(text.size());
 
     qsizetype i = 0;
-
     while (i < text.size()) {
         if (text.at(i) != QLatin1Char('&')) {
             out.append(text.at(i));
@@ -202,7 +203,7 @@ static QString htmlUnescape(const QString &text)
 
             QStringView entityView(entity);
 
-            if (entity.startsWith(QStringLiteral("#x"), Qt::CaseInsensitive))
+            if (entity.startsWith("#x"_L1, Qt::CaseInsensitive))
                 codePoint = entityView.sliced(2).toUInt(&ok, 16);
             else
                 codePoint = entityView.sliced(1).toUInt(&ok, 10);
@@ -236,7 +237,7 @@ QVector<HtmlNodePtr> HtmlParser::parse(const QString &html)
     // Parse input into tokens
     QVector<HtmlToken> tokens = parser.tokenize();
 
-    // initialize current token position
+    // Initialize current token position
     int pos = 0;
 
     // Build and return syntax tree
@@ -421,14 +422,14 @@ QVector<HtmlNodePtr> HtmlParser::parseChildNodes(const QVector<HtmlToken> &token
 void HtmlRenderContext::parseHeadNode(const HtmlNodePtr &headNode)
 {
     for (const HtmlNodePtr &child : headNode->children) {
-        if (child->name == QStringLiteral("style")) {
+        if (child->name == "style"_L1) {
             for (const HtmlNodePtr &styleNode : child->children) {
                 const QString &styleText = styleNode->content;
                 parseCssRules(styleText);
             }
-        } else if (child->name == QStringLiteral("meta")) {
+        } else if (child->name == "meta"_L1) {
             const CssProperties &attrs = child->attrs;
-            if (attrs.contains(QStringLiteral("name")) && attrs.contains(QStringLiteral("content")))
+            if (attrs.contains("name"_L1) && attrs.contains("content"_L1))
                 m_metadata.insert(attrs.value("name"), attrs.value("content"));
         }
     }
@@ -578,14 +579,14 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
 
     // Handle tags
     const QString tag = node->name.toLower();
-    if (tag == QStringLiteral("p")) {
+    if (tag == "p"_L1) {
         // Safety guard for not adding a new line directly after a list item
         if (!m_newListItem)
             insertBlock();
         else
             m_newListItem = false;
         m_newParagraph = true;
-    } else if (tag == QStringLiteral("br")) {
+    } else if (tag == "br"_L1) {
         if (!m_newParagraph) {
             finalizeBlock();
             insertBlock();
@@ -596,7 +597,7 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
         // Since br is a self enclosing tag, it's safe to return
         finalizeBlock();
         return;
-    } else if (tag == QStringLiteral("hr")) {
+    } else if (tag == "hr"_L1) {
         if (!m_newParagraph) {
             finalizeBlock();
             insertBlock();
@@ -611,25 +612,25 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
         // Since hr is a self enclosing tag, it's safe to return
         finalizeBlock();
         return;
-    } else if (tag == QStringLiteral("strong") || tag == QStringLiteral("b")) {
+    } else if (tag == "strong"_L1 || tag == "b"_L1) {
         m_charFmt.setFontWeight(StrongFontWeight);
         fmtChanged = true;
-    } else if (tag == QStringLiteral("em") || tag == QStringLiteral("i")) {
+    } else if (tag == "em"_L1 || tag == "i"_L1) {
         m_charFmt.setFontItalic(true);
         fmtChanged = true;
-    } else if (tag == QStringLiteral("ins") || tag == QStringLiteral("u")) {
+    } else if (tag == "ins"_L1 || tag == "u"_L1) {
         m_charFmt.setFontUnderline(true);
         fmtChanged = true;
-    } else if (tag == QStringLiteral("a")) {
+    } else if (tag == "a"_L1) {
         m_charFmt.setAnchor(true);
-        if (node->attrs.contains(QStringLiteral("href")))
-            m_charFmt.setAnchorHref(node->attrs.value(QStringLiteral("href")));
+        if (node->attrs.contains("href"_L1))
+            m_charFmt.setAnchorHref(node->attrs.value("href"_L1));
         m_charFmt.setForeground(linkColor());
         fmtChanged = true;
-    } else if (tag == QStringLiteral("ul")) {
+    } else if (tag == "ul"_L1) {
         // Increase value for more indent (in case more than one ul tag is used)
         ++m_nestedUlTags;
-    } else if (tag == QStringLiteral("li")) {
+    } else if (tag == "li"_L1) {
         if (m_nestedUlTags <= 0)
             qDebug("Warning: Misplaced <li> tag. Lists might not be added properly.");
 
@@ -655,8 +656,8 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
 
         // Activate safety guard for not adding a newline with a paragraph directly after
         m_newListItem = true;
-    } else if (tag == QStringLiteral("h1") || tag == QStringLiteral("h2") ||
-               tag == QStringLiteral("h3") || tag == QStringLiteral("h4")) {
+    } else if (tag == "h1"_L1 || tag == "h2"_L1 ||
+               tag == "h3"_L1 || tag == "h4"_L1) {
         // Start heading in a new block
         insertBlock();
 
@@ -679,10 +680,10 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
     // Apply styles to m_charFmt
     fmtChanged = fmtChanged || applyHtmlStyle(style, m_charFmt);
 
-    if (m_newParagraph && tag != QStringLiteral("p"))
+    if (m_newParagraph && tag != "p"_L1)
         // Remove guard for not adding a new line when a <br /> tag follows directly after a paragraph
         m_newParagraph = false;
-    if (m_newListItem && tag != QStringLiteral("li"))
+    if (m_newListItem && tag != "li"_L1)
         // Remove guard for not adding a new line when a <p> tag follows directly after a list item
         m_newListItem = false;
 
@@ -702,21 +703,21 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
     }
 
     // Handle closing tags
-    if (tag == QStringLiteral("p")) {
+    if (tag == "p"_L1) {
         if (!m_newListItem)
             finalizeBlock();
         m_newParagraph = false;
-    } else if (tag == QStringLiteral("ul")) {
+    } else if (tag == "ul"_L1) {
         --m_nestedUlTags;
         if (m_nestedUlTags == 0) {
             // Remove list reference
             m_currentList = nullptr;
             m_blockFmt.setObjectIndex(-1);
         }
-    } else if (tag == QStringLiteral("li"))
+    } else if (tag == "li"_L1)
         finalizeBlock();
-    else if (tag == QStringLiteral("h1") || tag == QStringLiteral("h2") ||
-             tag == QStringLiteral("h3") || tag == QStringLiteral("h4")) {
+    else if (tag == "h1"_L1 || tag == "h2"_L1 ||
+             tag == "h3"_L1 || tag == "h4"_L1) {
         finalizeBlock();
         m_blockFmt.setHeadingLevel(0);
     }
@@ -758,22 +759,22 @@ QTextDocument *documentFromHtml(const QString &html, QObject *parent)
     QVector<HtmlNodePtr> nodes = HtmlParser::parse(html);
 
     // Find <html> tag
-    HtmlNodePtr htmlNode = HtmlParser::findNode(nodes, "html");
+    HtmlNodePtr htmlNode = HtmlParser::findNode(nodes, "html"_L1);
     if (!htmlNode)
         // Put everything inside <html>...</html> tag
-        htmlNode = HtmlNode::makeElement("html", {}, nodes);
+        htmlNode = HtmlNode::makeElement("html"_L1, {}, nodes);
 
     // Setup context for tag styles
     HtmlRenderContext context;
-    HtmlNodePtr headNode = HtmlParser::findNode(htmlNode, "head");
+    HtmlNodePtr headNode = HtmlParser::findNode(htmlNode, "head"_L1);
     if (headNode)
         context.parseHeadNode(headNode);
 
     // Find <body> tag
-    HtmlNodePtr bodyNode = HtmlParser::findNode(htmlNode, "body");
+    HtmlNodePtr bodyNode = HtmlParser::findNode(htmlNode, "body"_L1);
     if (!bodyNode)
         // Create bodyNode as root for parsing
-        bodyNode = HtmlNode::makeElement("body", {}, nodes);
+        bodyNode = HtmlNode::makeElement("body"_L1, {}, nodes);
 
     // Render AST onto QTextDocument
     return HtmlRenderer::createDocument(bodyNode, context, parent);

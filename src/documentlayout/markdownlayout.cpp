@@ -1,5 +1,7 @@
 #include "markdownlayout.h"
 
+#include "textformat/constdefs.h"
+
 #include <QPainter>
 #include <QTextBlock>
 #include <QTextList>
@@ -324,6 +326,7 @@ void MarkdownLayout::drawListItem(QPainter *painter, const PaintContext &context
     case QTextListFormat::ListDisc:
     case QTextListFormat::ListCircle:
     case QTextListFormat::ListSquare:
+    case ExtendedListStyle::ListDash:
         size.setWidth(fontMetrics.lineSpacing() / 3);
         size.setHeight(size.width());
         break;
@@ -356,8 +359,19 @@ void MarkdownLayout::drawListItem(QPainter *painter, const PaintContext &context
         painter->setPen(Qt::NoPen);
         painter->drawEllipse(rct);
         break;
-    case QTextListFormat::ListStyleUndefined:
+    case ExtendedListStyle::ListDash: {
+        painter->setFont(font);
+        painter->setPen(QPen(context.palette.text().color()));
+
+        const qreal dashWidth = fontMetrics.horizontalAdvance("-");
+
+        // rct ist die gleiche Marker-Box, die du auch für Disc/Circle/Square nutzt.
+        const qreal x = rct.center().x() - dashWidth / 2.0;
+        const qreal y = pos.y() + fontMetrics.ascent();
+
+        painter->drawText(QPointF(x, y), "-");
         break;
+    }
     default:
         break;
     }

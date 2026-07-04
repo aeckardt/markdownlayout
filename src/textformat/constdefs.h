@@ -10,6 +10,11 @@ class QTextBlockFormat;
 class QTextCharFormat;
 class QTextLength;
 
+// Define value for dash in QTextListFormat style property
+namespace ExtendedListStyle {
+inline constexpr QTextListFormat::Style ListDash            = (QTextListFormat::Style)-40;
+}
+
 // Modifiable editor style constants
 inline constexpr QTextListFormat::Style TopLevelListStyle   = QTextListFormat::ListDisc;
 inline constexpr QTextListFormat::Style LowerLevelListStyle = QTextListFormat::ListCircle;
