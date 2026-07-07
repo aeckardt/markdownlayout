@@ -45,7 +45,7 @@ private:
     HtmlScopePtr tryParseHtmlTag();
     QByteArray readIdentifier(int &fwdPos) const;
     void skipWhitespaces(int &fwdPos) const;
-    QByteArray readAttributeValue(int &fwdPos) const;
+    QByteArray readAttributeValue(int &fwdPos, bool &ok) const;
 
     int m_pos;
     int m_length;

@@ -93,22 +93,9 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
                 if (fwdPos >= m_length)
                     return {};
 
-                QByteArray value;
-                ch = m_input.at(fwdPos);
-                if (ch == '"' || ch == '\'') {
-                    const char quotType = ch;
-                    ++fwdPos;
-                    while (fwdPos < m_length && m_input.at(fwdPos) != quotType) {
-                        value += m_input.at(fwdPos);
-                        ++fwdPos;
-                    }
-                    if (fwdPos >= m_length)
-                        return {};
-                    ++fwdPos;
-                } else
-                    value = readAttributeValue(fwdPos);
-
-                if (value.isEmpty())
+                bool ok;
+                QByteArray value = readAttributeValue(fwdPos, ok);
+                if (!ok)
                     return {};
 
                 attrValue = value;
@@ -179,19 +166,39 @@ void MarkdownHtmlParser::skipWhitespaces(int &fwdPos) const
     }
 }
 
-QByteArray MarkdownHtmlParser::readAttributeValue(int &fwdPos) const
+QByteArray MarkdownHtmlParser::readAttributeValue(int &fwdPos, bool &ok) const
 {
     QByteArray value;
-    while (fwdPos < m_length) {
-        static constexpr QByteArrayView specialChars("-_.:&;,");
-        const char ch = m_input.at(fwdPos);
-        if (isAlphaNumeric(ch) || specialChars.contains(ch)) {
+    const char ch = m_input.at(fwdPos);
+    if (ch == '"' || ch == '\'') {
+        const char quotType = ch;
+        ++fwdPos;
+        while (fwdPos < m_length && m_input.at(fwdPos) != quotType) {
+            value += m_input.at(fwdPos);
+            ++fwdPos;
+        }
+        if (fwdPos >= m_length) {
+            ok = false;
+            return {};
+        }
+        ++fwdPos;
+    } else {
+        while (fwdPos < m_length) {
+            static constexpr QByteArrayView delimiterChars("><\"\'`=");
+            const char ch = m_input.at(fwdPos);
+            if (delimiterChars.contains(ch))
+                break;
             value += ch;
             ++fwdPos;
-        } else
-            return value;
+        }
+        if (value.isEmpty()) {
+            ok = false;
+            return {};
+        }
     }
-    return {};
+
+    ok = true;
+    return value;
 }
 
 static inline bool isAlpha(const char ch)
