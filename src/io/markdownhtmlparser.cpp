@@ -1,5 +1,10 @@
 #include "markdownhtmlparser.h"
 
+// Define parsing helpers
+static bool isAlpha(const char ch);
+static bool isAlphaNumeric(const char ch);
+static bool isSpace(const char ch);
+
 HtmlScopePtr MarkdownHtmlParser::parseTag(const QByteArray &html)
 {
     MarkdownHtmlParser htmlParser(html);
@@ -47,7 +52,7 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
         if (m_input.at(fwdPos) == QLatin1Char('>')) {
             // Valid closing tag found!
             // Advance position for parser
-            HtmlScopePtr scope = HtmlScope::makeShared(
+            HtmlScopePtr scope = HtmlScope::createPtr(
                         tagName,
                         HtmlScope::CloseTag);
             m_pos = fwdPos + 1;
@@ -111,7 +116,7 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
             // Self closing tag
             if (fwdPos + 1 < m_length && m_input.at(fwdPos + 1) == QLatin1Char('>')) {
                 // Valid self closing tag found!
-                HtmlScopePtr scope = HtmlScope::makeShared(
+                HtmlScopePtr scope = HtmlScope::createPtr(
                             tagName,
                             HtmlScope::SelfClosingTag,
                             attrs);
@@ -121,7 +126,7 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
             return {};
         } else if (ch == QLatin1Char('>')) {
             // Closing tag found
-            HtmlScopePtr scope = HtmlScope::makeShared(
+            HtmlScopePtr scope = HtmlScope::createPtr(
                         tagName,
                         HtmlScope::OpenTag,
                         attrs);
@@ -135,16 +140,6 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
     return {};
 }
 
-static inline bool isAlpha(char ch)
-{
-    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
-}
-
-static inline bool isAlphaNumeric(char ch)
-{
-    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
-}
-
 QByteArray MarkdownHtmlParser::readIdentifier(int &fwdPos) const
 {
     // Read name
@@ -155,10 +150,14 @@ QByteArray MarkdownHtmlParser::readIdentifier(int &fwdPos) const
     if (!isAlpha(identifier.at(0)))
         return {};
     ++fwdPos;
-    while (fwdPos < m_length && (isAlphaNumeric(m_input.at(fwdPos)) ||
-                                 QStringLiteral("-_:").contains(m_input.at(fwdPos)))) {
-        identifier += m_input.at(fwdPos);
-        ++fwdPos;
+    while (fwdPos < m_length) {
+        static constexpr QByteArrayView specialChars("-_:");
+        const char ch = m_input.at(fwdPos);
+        if (isAlphaNumeric(ch) || specialChars.contains(ch)) {
+            identifier += ch;
+            ++fwdPos;
+        } else
+            break;
     }
     if (fwdPos >= m_length)
         // If the end of the input has been reached, there is no valid HTML tag
@@ -169,10 +168,9 @@ QByteArray MarkdownHtmlParser::readIdentifier(int &fwdPos) const
 
 void MarkdownHtmlParser::skipWhitespaces(int &fwdPos) const
 {
-    QChar ch;
     while (fwdPos < m_length) {
-        ch = m_input.at(fwdPos);
-        if (ch.isSpace())
+        const char ch = m_input.at(fwdPos);
+        if (isSpace(ch))
             ++fwdPos;
         else
             break;
@@ -183,9 +181,10 @@ QByteArray MarkdownHtmlParser::readAttributeValue(int &fwdPos) const
 {
     QByteArray value;
     while (fwdPos < m_length) {
-        const QChar ch = m_input.at(fwdPos);
-        if (ch.isLetterOrNumber() || QStringLiteral("-_.:&;,").contains(ch)) {
-            value += ch.toLatin1();
+        static constexpr QByteArrayView specialChars("-_.:&;,");
+        const char ch = m_input.at(fwdPos);
+        if (isAlphaNumeric(ch) || specialChars.contains(ch)) {
+            value += ch;
             ++fwdPos;
         } else
             return value;
@@ -193,3 +192,17 @@ QByteArray MarkdownHtmlParser::readAttributeValue(int &fwdPos) const
     return {};
 }
 
+static inline bool isAlpha(const char ch)
+{
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+}
+
+static inline bool isAlphaNumeric(const char ch)
+{
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
+}
+
+static inline bool isSpace(const char ch)
+{
+    return ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t';
+}
