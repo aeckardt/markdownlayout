@@ -4,6 +4,7 @@
 #include "textformat/blocktypes.h"
 #include "textformat/constdefs.h"
 #include "htmlstyle.h"
+#include "markdownhtmlparser.h"
 
 #include <QByteArray>
 #include <QRegularExpression>
@@ -14,6 +15,7 @@
 #include <QTextFormat>
 #include <QTextList>
 #include <QTextListFormat>
+#include <QtGlobal>
 
 using namespace Qt::StringLiterals;
 
@@ -31,6 +33,10 @@ public:
 
 private:
     explicit MarkdownRenderer(QTextCursor *cursor);
+
+    // HTML handlers
+    void enterHtml(const HtmlScopePtr &scope);
+    void leaveHtml(const HtmlScopePtr &scope);
 
     // Render functions
     void insertBlock();
@@ -51,6 +57,9 @@ private:
     bool m_newListItem;
     QStack<TextList> m_listStack;
     int m_blockQuoteLevel;
+    QStack<HtmlScopePtr> m_htmlScopeStack;
+
+    QFont m_monoFont;
 };
 
 static int _cbEnterBlock(MD_BLOCKTYPE type, void *detail, void *userdata)
@@ -92,7 +101,7 @@ QTextDocument *MarkdownRenderer::createDocument(const QByteArray &markdown, QObj
     document->setUndoRedoEnabled(false);
     cursor.beginEditBlock();
 
-    MarkdownRenderer mdr(&cursor);
+    MarkdownRenderer renderer(&cursor);
 
     unsigned flags = 0;
     MD_PARSER callbacks = {
@@ -108,7 +117,7 @@ QTextDocument *MarkdownRenderer::createDocument(const QByteArray &markdown, QObj
     };
 
     // Parse with MD4C / Render with callbacks
-    md_parse(markdown.constData(), MD_SIZE(markdown.size()), &callbacks, &mdr);
+    md_parse(markdown.data(), MD_SIZE(markdown.size()), &callbacks, &renderer);
 
     // Restore undoRedoEnabled
     cursor.endEditBlock();
@@ -123,10 +132,17 @@ MarkdownRenderer::MarkdownRenderer(QTextCursor *cursor)
       m_atBeginning(true),
       m_newParagraph(false),
       m_newListItem(false),
-      m_blockQuoteLevel(0)
+      m_blockQuoteLevel(0),
+      m_monoFont(QFontDatabase::systemFont(QFontDatabase::FixedFont))
 {
     Q_ASSERT(m_cursor);
     m_charFmtStack.push(defaultCharFormat());
+
+    QTextDocument *doc = m_cursor->document();
+    if (doc->defaultFont().pointSize() != -1)
+        m_monoFont.setPointSize(doc->defaultFont().pointSize());
+    else
+        m_monoFont.setPixelSize(doc->defaultFont().pixelSize());
 }
 
 int MarkdownRenderer::cbEnterBlock(int blockType, void *detail)
@@ -214,6 +230,20 @@ int MarkdownRenderer::cbEnterBlock(int blockType, void *detail)
 
         break;
     }
+    case MD_BLOCK_OL: {
+        MD_BLOCK_OL_DETAIL *ol_detail = static_cast<MD_BLOCK_OL_DETAIL *>(detail);
+
+        TextList list;
+        list.fmt.setIndent(m_listStack.count() + 1);
+        list.fmt.setStyle(QTextListFormat::ListDecimal);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+        list.fmt.setStart(int(ol_detail->start));
+#endif
+        list.fmt.setNumberSuffix(QString(QChar::fromLatin1(ol_detail->mark_delimiter)));
+
+        m_listStack.push(list);
+        break;
+    }
     case MD_BLOCK_QUOTE:
         ++m_blockQuoteLevel;
         break;
@@ -252,10 +282,10 @@ int MarkdownRenderer::cbLeaveBlock(int blockType, void *detail)
         m_newParagraph = false;
         break;
     case MD_BLOCK_UL:
+    case MD_BLOCK_OL:
         m_listStack.pop();
         break;
     case MD_BLOCK_QUOTE:
-        finalizeBlock();
         --m_blockQuoteLevel;
         break;
     default:
@@ -268,46 +298,43 @@ int MarkdownRenderer::cbLeaveBlock(int blockType, void *detail)
 
 int MarkdownRenderer::cbEnterSpan(int spanType, void *detail)
 {
+    QTextCharFormat charFmt(m_charFmtStack.top());
+
     switch (spanType) {
-    case MD_SPAN_STRONG: {
-        QTextCharFormat boldFmt(m_charFmtStack.top());
-        boldFmt.setFontWeight(StrongFontWeight);
-        m_charFmtStack.push(boldFmt);
+    case MD_SPAN_STRONG:
+        charFmt.setFontWeight(StrongFontWeight);
         break;
-    }
-    case MD_SPAN_EM: {
-        QTextCharFormat italicFmt(m_charFmtStack.top());
-        italicFmt.setFontItalic(true);
-        m_charFmtStack.push(italicFmt);
+    case MD_SPAN_EM:
+        charFmt.setFontItalic(true);
         break;
-    }
-    case MD_SPAN_U: {
-        QTextCharFormat underlineFmt(m_charFmtStack.top());
-        underlineFmt.setFontUnderline(true);
-        m_charFmtStack.push(underlineFmt);
+    case MD_SPAN_U:
+        charFmt.setFontUnderline(true);
         break;
-    }
     case MD_SPAN_A: {
         MD_SPAN_A_DETAIL *a_detail = static_cast<MD_SPAN_A_DETAIL *>(detail);
-
-        QTextCharFormat linkFmt(m_charFmtStack.top());
-        linkFmt.setAnchor(true);
+        charFmt.setAnchor(true);
         if (a_detail->href.size > 0) {
             const QString href = QUrl::fromPercentEncoding(
                         QByteArray(a_detail->href.text, a_detail->href.size));
-            linkFmt.setAnchorHref(href);
+            charFmt.setAnchorHref(href);
         }
-        linkFmt.setForeground(linkColor());
-        m_charFmtStack.push(linkFmt);
-
+        charFmt.setForeground(linkColor());
         break;
     }
+    case MD_SPAN_CODE:
+        charFmt.setFontFixedPitch(true);
+        charFmt.setFont(m_monoFont);
+        break;
+    case MD_SPAN_DEL:
+        charFmt.setFontStrikeOut(true);
+        break;
     default:
-        // Images, inline code, strikethrough etc. are currently not styled.
+        // Images, inline code etc. are currently not styled.
         // Their child text still arrives through cbText().
-        ;
+        return 0;
     }
 
+    m_charFmtStack.push(charFmt);
     return 0;  // no error
 }
 
@@ -320,6 +347,8 @@ int MarkdownRenderer::cbLeaveSpan(int spanType, void *detail)
     case MD_SPAN_EM:
     case MD_SPAN_U:
     case MD_SPAN_A:
+    case MD_SPAN_CODE:
+    case MD_SPAN_DEL:
         m_charFmtStack.pop();
         break;
     default:
@@ -332,29 +361,78 @@ int MarkdownRenderer::cbLeaveSpan(int spanType, void *detail)
 int MarkdownRenderer::cbText(int textType, const char *text, unsigned int size)
 {
     switch (textType) {
+    case MD_TEXT_BR:
+        m_cursor->insertText(QString(QChar::LineSeparator), m_charFmtStack.top());
+        break;
+    case MD_TEXT_SOFTBR:
+        m_cursor->insertText(QString(u' '), m_charFmtStack.top());
+        break;
+    case MD_TEXT_NULLCHAR:
+        m_cursor->insertText(QString(QChar(0xFFFD)), m_charFmtStack.top());
+        break;
+    case MD_TEXT_HTML: {
+        HtmlScopePtr htmlScope = MarkdownHtmlParser::parseTag(QByteArray(text, size));
+        if (!htmlScope)
+            // No HTML tag identified
+            // -> Warn or ignore
+            break;
+        switch (htmlScope->type()) {
+        case HtmlScope::OpenTag:
+            enterHtml(htmlScope);
+            break;
+        case HtmlScope::CloseTag:
+            leaveHtml(htmlScope);
+            break;
+        case HtmlScope::SelfClosingTag:
+            enterHtml(htmlScope);
+            leaveHtml(htmlScope);
+            break;
+        default:
+            // Suppress compiler warning
+            ;
+        }
+        break;
+    }
     case MD_TEXT_NORMAL:
+    case MD_TEXT_CODE:
+    default:
         // Insert text with the current char format
         m_cursor->insertText(QString::fromUtf8(text, size), m_charFmtStack.top());
-
-        // Remove newline guards because text has been added
-        m_newParagraph = false;
-        m_newListItem = false;
-
         break;
-    case MD_TEXT_BR:
-        if (!m_newParagraph) {
-            finalizeBlock();
-            insertBlock();
-        } else
-            // Don't add a new line if the paragraph just started
-            // Because a new line has already been added!
-            m_newParagraph = false;
-        break;
-    default:
-        ;
     }
 
+    // Remove newline guards because text has been added
+    m_newParagraph = false;
+    m_newListItem = false;
+
     return 0;  // no error
+}
+
+void MarkdownRenderer::enterHtml(const HtmlScopePtr &scope)
+{
+    const QByteArray tag = scope->tag().toLower();
+    if (tag == "ins") {
+        QTextCharFormat underlineFmt(m_charFmtStack.top());
+        underlineFmt.setFontUnderline(true);
+        m_charFmtStack.push(underlineFmt);
+    } else if (tag == "span") {
+        QTextCharFormat spanFmt(m_charFmtStack.top());
+        applyHtmlStyle(scope->attrs(), spanFmt);
+        m_charFmtStack.push(spanFmt);
+    }
+    m_htmlScopeStack.push(scope);
+}
+
+void MarkdownRenderer::leaveHtml(const HtmlScopePtr &scope)
+{
+    if (m_htmlScopeStack.empty() || m_htmlScopeStack.top()->tag() != scope->tag())
+        // Closing tag has no matching opening tag
+        // -> Warn or ignore
+        return;
+    const QByteArray tag = scope->tag().toLower();
+    if (tag == "ins" || tag == "span")
+        m_charFmtStack.pop();
+    m_htmlScopeStack.pop();
 }
 
 void MarkdownRenderer::insertBlock()
@@ -366,8 +444,6 @@ void MarkdownRenderer::insertBlock()
 
     m_cursor->insertBlock();
     m_blockFmt = defaultBlockFormat();
-    m_charFmtStack.clear();
-    m_charFmtStack.push(defaultCharFormat());
     m_cursor->setCharFormat(m_charFmtStack.top());
 }
 
@@ -378,9 +454,8 @@ void MarkdownRenderer::finalizeBlock()
         m_blockFmt.setProperty(QTextFormat::BlockQuoteLevel, m_blockQuoteLevel);
     m_cursor->setBlockFormat(m_blockFmt);
 
-    // Use current QTextCharFormat to set block charformat for the next line
-    Q_ASSERT(m_charFmtStack.size() == 1);
-    m_cursor->setCharFormat(m_charFmtStack.top());
+    // Use default QTextCharFormat to indicate block charformat for the next line
+    m_cursor->setCharFormat(defaultCharFormat());
 }
 
 QTextDocument *documentFromMarkdown(const QByteArray &markdown, QObject *parent)

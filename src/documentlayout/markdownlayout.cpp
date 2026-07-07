@@ -82,14 +82,12 @@ QSizeF MarkdownLayout::documentSize() const
     return m_documentSize;
 }
 
-/*
- * blockBoundingRect is not the decorated paint rect.
+/* blockBoundingRect is not the decorated paint rect.
  * It is the public QTextBlock geometry used by QTextEdit/QWidgetTextControl.
  *
  * It must include all QTextLines, but it should also include the layout
  * origin because QTextLines may be shifted to the right for Markdown
- * decorations such as list markers or blockquote padding.
- */
+ * decorations such as list markers or blockquote padding. */
 QRectF MarkdownLayout::blockBoundingRect(const QTextBlock &block) const
 {
     const_cast<MarkdownLayout *>(this)->ensureLayout();
@@ -247,14 +245,12 @@ qreal MarkdownLayout::bottomPaddingForBlock(const QTextBlock &block) const
     return 0.0;
 }
 
-/*
- * Match Qt's document indent model: the visual x-offset is the
+/* Match Qt's document indent model: the visual x-offset is the
  * sum of the block indent and the QTextListFormat indent, multiplied by
  * document()->indentWidth().
  *
  * List nesting is stored per block via QTextBlockFormat::indent().
- * QTextListFormat::indent() remains the list-wide base indent.
- */
+ * QTextListFormat::indent() remains the list-wide base indent. */
 qreal MarkdownLayout::blockIndent(const QTextBlock &block) const
 {
     int indent = block.blockFormat().indent();

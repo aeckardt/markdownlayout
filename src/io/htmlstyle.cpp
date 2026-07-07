@@ -1,32 +1,32 @@
 #include "htmlstyle.h"
 
+#include <QByteArray>
 #include <QFont>
 #include <QHash>
+#include <QList>
 #include <QRegularExpression>
-#include <QString>
-#include <QStringList>
 #include <QTextCharFormat>
 
 bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
 {
     bool changed = false;
 
-    if (style.contains(QStringLiteral("font-size"))) {
-        const QString raw = style.value(QStringLiteral("font-size")).trimmed();
+    if (style.contains("font-size")) {
+        const QByteArray raw = style.value("font-size").trimmed();
         static const QRegularExpression numberRe(QStringLiteral("^(\\d+)"));
         const auto match = numberRe.match(raw);
         if (match.hasMatch()) {
             charFmt.setFontPointSize(match.captured(1).toInt());
             changed = true;
         } else {
-            static const QHash<QString, int> namedSizes {
-                {QStringLiteral("xx-small"), 8},
-                {QStringLiteral("x-small"), 9},
-                {QStringLiteral("small"), 10},
-                {QStringLiteral("medium"), 12},
-                {QStringLiteral("large"), 14},
-                {QStringLiteral("x-large"), 16},
-                {QStringLiteral("xx-large"), 18},
+            static const QHash<QByteArray, int> namedSizes {
+                {"xx-small", 8},
+                {"x-small", 9},
+                {"small", 10},
+                {"medium", 12},
+                {"large", 14},
+                {"x-large", 16},
+                {"xx-large", 18},
             };
             const auto size = namedSizes.value(raw.toLower(), -1);
             if (size > 0) {
@@ -37,22 +37,22 @@ bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
         }
     }
 
-    if (style.contains(QStringLiteral("font-weight"))) {
-        const QString raw = style.value(QStringLiteral("font-weight")).trimmed().toLower();
-        static const QHash<QString, QFont::Weight> weights {
-            {QStringLiteral("normal"), QFont::Normal},
-            {QStringLiteral("bold"), QFont::Bold},
-            {QStringLiteral("bolder"), QFont::Bold},
-            {QStringLiteral("lighter"), QFont::Light},
-            {QStringLiteral("100"), QFont::Thin},
-            {QStringLiteral("200"), QFont::ExtraLight},
-            {QStringLiteral("300"), QFont::Light},
-            {QStringLiteral("400"), QFont::Normal},
-            {QStringLiteral("500"), QFont::Medium},
-            {QStringLiteral("600"), QFont::DemiBold},
-            {QStringLiteral("700"), QFont::Bold},
-            {QStringLiteral("800"), QFont::ExtraBold},
-            {QStringLiteral("900"), QFont::Black},
+    if (style.contains("font-weight")) {
+        const QByteArray raw = style.value("font-weight").trimmed().toLower();
+        static const QHash<QByteArray, QFont::Weight> weights {
+            {"normal", QFont::Normal},
+            {"bold", QFont::Bold},
+            {"bolder", QFont::Bold},
+            {"lighter", QFont::Light},
+            {"100", QFont::Thin},
+            {"200", QFont::ExtraLight},
+            {"300", QFont::Light},
+            {"400", QFont::Normal},
+            {"500", QFont::Medium},
+            {"600", QFont::DemiBold},
+            {"700", QFont::Bold},
+            {"800", QFont::ExtraBold},
+            {"900", QFont::Black},
         };
         if (weights.contains(raw)) {
             charFmt.setFontWeight(weights.value(raw));
@@ -61,8 +61,8 @@ bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
             qWarning() << "Unsupported font-weight ignored:" << raw;
     }
 
-    if (style.contains(QStringLiteral("font-style"))) {
-        const QString raw = style.value(QStringLiteral("font-style")).trimmed().toLower();
+    if (style.contains("font-style")) {
+        const QString raw = style.value("font-style").trimmed().toLower();
         if (raw == QStringLiteral("italic") || raw == QStringLiteral("oblique")) {
             charFmt.setFontItalic(true);
             changed = true;
@@ -73,8 +73,8 @@ bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
             qWarning() << "Unsupported font-style ignored:" << raw;
     }
 
-    if (style.contains(QStringLiteral("text-decoration"))) {
-        const QString raw = style.value(QStringLiteral("text-decoration")).trimmed().toLower();
+    if (style.contains("text-decoration")) {
+        const QString raw = style.value("text-decoration").trimmed().toLower();
         if (raw == QStringLiteral("underline")) {
             charFmt.setFontUnderline(true);
             changed = true;
@@ -88,26 +88,26 @@ bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
     return changed;
 }
 
-CssProperties parseProperties(const QString &propertiesStr)
+CssProperties parseProperties(const QByteArray &propertiesStr)
 {
     CssProperties properties;
 
-    const QStringList declarations =
-        propertiesStr.split(QLatin1Char(';'), Qt::KeepEmptyParts);
+    const QList<QByteArray> declarations =
+        propertiesStr.split(';');
 
-    for (const QString &decl : declarations) {
-        const QString property = decl.trimmed();
+    for (const QByteArray &decl : declarations) {
+        const QByteArray property = decl.trimmed();
 
         if (property.isEmpty())
             continue;
 
-        const qsizetype colonIndex = property.indexOf(QLatin1Char(':'));
+        const qsizetype colonIndex = property.indexOf(':');
 
         if (colonIndex < 0)
             continue;
 
-        const QString name = property.left(colonIndex).trimmed();
-        const QString value = property.mid(colonIndex + 1).trimmed();
+        const QByteArray name = property.left(colonIndex).trimmed();
+        const QByteArray value = property.mid(colonIndex + 1).trimmed();
 
         properties.insert(name, value);
     }

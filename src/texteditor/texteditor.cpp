@@ -190,10 +190,8 @@ void TextEditor::setDocument(QTextDocument *document)
     ensureCursorVisible();
 }
 
-/*
- * Override the copy function to generate custom HTML mime data that includes indent levels,
- * headings, and list points.
- */
+/* Override the copy function to generate custom HTML mime data that includes indent levels,
+ * headings, and list points. */
 void TextEditor::copy()
 {
     QMimeData *mimeData = new QMimeData;
@@ -210,9 +208,7 @@ void TextEditor::copy()
     QGuiApplication::clipboard()->setMimeData(mimeData);
 }
 
-/*
- * Copy the whole document as a Markdown string.
- */
+/* Copy the whole document as a Markdown string. */
 void TextEditor::copyAsMarkdown()
 {
     QMimeData *mimeData = new QMimeData;
@@ -246,9 +242,7 @@ void TextEditor::paste()
     }
 }
 
-/*
- * Analogous to the copy function - just with selection removal after the operation.
- */
+/* Analogous to the copy function - just with selection removal after the operation. */
 void TextEditor::cut()
 {
     copy();
@@ -461,11 +455,9 @@ void TextEditor::mergeFormatOnSelection(const QTextCharFormat &charFmt, bool sel
     cursor.endEditBlock();
 }
 
-/*
- * Indent/Unindent affects selected list items.
+/* Indent/Unindent affects selected list items.
  * Non-list paragraphs inside the selection are ignored.
- * If no selected block is a list item, the action does nothing.
- */
+ * If no selected block is a list item, the action does nothing. */
 void TextEditor::adjustListIndentation(int delta)
 {
     QTextCursor cursor = textCursor();
@@ -505,9 +497,7 @@ void TextEditor::adjustListIndentationForBlock(const QTextBlock &block, int delt
     emit blockFormatChanged(block);
 }
 
-/*
- * Ensure custom behavior when adding a new line with keyboard.
- */
+/* Ensure custom behavior when adding a new line with keyboard. */
 void TextEditor::insertBlock()
 {
     QTextCursor cursor = textCursor();

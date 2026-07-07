@@ -4,11 +4,11 @@
 #include "textformat/blocktypes.h"
 #include "textformat/constdefs.h"
 
+#include <QByteArray>
 #include <QHash>
 #include <QRegularExpression>
 #include <QSet>
 #include <QString>
-#include <QStringView>
 #include <QTextBlockFormat>
 #include <QTextCharFormat>
 #include <QTextCursor>
@@ -29,9 +29,9 @@ struct HtmlToken {
     };
 
     Type type;
-    QString name;  // tag name
+    QByteArray name;  // tag name
     CssProperties attrs;
-    QString content;  // for text or comments
+    QByteArray content;  // for text or comments
 };
 
 using TokenType = HtmlToken::Type;
@@ -45,22 +45,22 @@ struct HtmlNode {
         Text
     };
 
-    HtmlNode(const QString &name, const CssProperties &attrs, const QVector<HtmlNodePtr> &children = {})
+    HtmlNode(const QByteArray &name, const CssProperties &attrs, const QVector<HtmlNodePtr> &children = {})
         : type(Type::Element), name(name), attrs(attrs), children(children) {}
-    HtmlNode(const QString &content) : type(Type::Text), content(content) {}
+    HtmlNode(const QByteArray &content) : type(Type::Text), content(content) {}
 
-    static HtmlNodePtr makeElement(const QString &name, const CssProperties &attrs,
+    static HtmlNodePtr makeElement(const QByteArray &name, const CssProperties &attrs,
         const QVector<HtmlNodePtr> &children = {})
     { return std::make_shared<HtmlNode>(name, attrs, children); }
 
-    static HtmlNodePtr makeText(const QString &content)
+    static HtmlNodePtr makeText(const QByteArray &content)
     { return std::make_shared<HtmlNode>(content); }
 
     Type type;
-    QString name;  // tag name if element
+    QByteArray name;  // tag name if element
     CssProperties attrs;
     QVector<HtmlNodePtr> children;
-    QString content;  // only for text nodes
+    QByteArray content;  // only for text nodes
 };
 
 using NodeType = HtmlNode::Type;
@@ -246,16 +246,14 @@ QVector<HtmlNodePtr> HtmlParser::parse(const QString &html)
     return parser.parseChildNodes(tokens, pos);
 }
 
-/*
- * findNode recursively searches for a node with the given tag name in the AST.
+/* findNode recursively searches for a node with the given tag name in the AST.
  *
  * Parameters:
  *     root (HtmlNodePtr): The root of the AST or a list of nodes.
  *     tagName (QString): The tag name to search for (case-insensitive).
  *
  * Returns:
- *     HtmlNodePtr: The first node matching the tag name, or nullptr if not found.
- */
+ *     HtmlNodePtr: The first node matching the tag name, or nullptr if not found. */
 HtmlNodePtr HtmlParser::findNode(const HtmlNodePtr &root, const QString &tagName)
 {
     // Check if the current node matches the tag (case-insensitive).
@@ -297,8 +295,8 @@ QVector<HtmlToken> HtmlParser::tokenize() const
     while (it.hasNext()) {
         QRegularExpressionMatch match = it.next();
 
-        const QString tag = match.captured("tag");
-        const QString text = match.captured("text");
+        const QByteArray tag = match.captured("tag").toUtf8();
+        const QByteArray text = match.captured("text").toUtf8();
 
         if (!text.isEmpty()) {
             if (QString(text).remove('\n').trimmed().isEmpty())
@@ -306,16 +304,14 @@ QVector<HtmlToken> HtmlParser::tokenize() const
 
             HtmlToken token;
             token.type = TokenType::Text;
-            token.content = htmlUnescape(text);
+            token.content = htmlUnescape(text).toUtf8();
 
             tokens.append(token);
         }
         else if (!tag.isEmpty()) {
             if (tag.startsWith("</")) {
                 // End tag
-                const QString tagName = tag.mid(2, tag.length() - 3)
-                                           .trimmed()
-                                           .toLower();
+                const QByteArray tagName = tag.mid(2, tag.length() - 3).trimmed().toLower();
 
                 HtmlToken token;
                 token.type = TokenType::EndTag;
@@ -326,14 +322,14 @@ QVector<HtmlToken> HtmlParser::tokenize() const
             else {
                 const bool isSelfClosing = tag.endsWith("/>");
 
-                QString tagContent;
+                QByteArray tagContent;
                 if (isSelfClosing)
                     tagContent = tag.mid(1, tag.length() - 3).trimmed();
                 else
                     tagContent = tag.mid(1, tag.length() - 2).trimmed();
 
-                QString tagName;
-                QString attrString;
+                QByteArray tagName;
+                QByteArray attrString;
 
                 static const QRegularExpression whitespacePattern(R"(\s)");
                 const int firstSpace = tagContent.indexOf(whitespacePattern);
@@ -351,8 +347,8 @@ QVector<HtmlToken> HtmlParser::tokenize() const
                 while (attrIt.hasNext()) {
                     QRegularExpressionMatch attrMatch = attrIt.next();
 
-                    const QString name = attrMatch.captured("name").toLower();
-                    const QString value = attrMatch.captured("value");
+                    const QByteArray name = attrMatch.captured("name").toLower().toUtf8();
+                    const QByteArray value = attrMatch.captured("value").toUtf8();
 
                     attrs.insert(name, value);
                 }
@@ -429,7 +425,7 @@ void HtmlRenderContext::parseHeadNode(const HtmlNodePtr &headNode)
             }
         } else if (child->name == "meta"_L1) {
             const CssProperties &attrs = child->attrs;
-            if (attrs.contains("name"_L1) && attrs.contains("content"_L1))
+            if (attrs.contains("name") && attrs.contains("content"))
                 m_metadata.insert(attrs.value("name"), attrs.value("content"));
         }
     }
@@ -470,8 +466,7 @@ CssProperties HtmlRenderContext::parseInlineString(const QString &styleStr)
     return attrs;
 }
 
-/*
- * Parses a simple CSS string and inserts the properties into m_rules dictionary
+/* Parses a simple CSS string and inserts the properties into m_rules dictionary
  * mapping individual selectors to their respective property dictionaries.
  *
  * Example:
@@ -491,8 +486,7 @@ CssProperties HtmlRenderContext::parseInlineString(const QString &styleStr)
  *         "li": {"margin-left": "0px"}
  *    }
  *
- * It currently does not handle every legal edge case, for example semicolons inside quotes strings.
- */
+ * It currently does not handle every legal edge case, for example semicolons inside quotes strings. */
 void HtmlRenderContext::parseCssRules(const QString &cssText)
 {
     static const QRegularExpression rulePattern(R"(([^{]+)\{([^}]+)\})");

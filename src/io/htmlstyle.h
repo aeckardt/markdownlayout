@@ -1,15 +1,15 @@
 #ifndef HTMLSTYLE_H
 #define HTMLSTYLE_H
 
+#include <QByteArray>
 #include <QHash>
-#include <QString>
 
 class QTextCharFormat;
 
-typedef QHash<QString, QString> CssProperties;
-typedef QHash<QString, CssProperties> CssRules;
+typedef QHash<QByteArray, QByteArray> CssProperties;
+typedef QHash<QByteArray, CssProperties> CssRules;
 
 bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFormat);
-CssProperties parseProperties(const QString &propertiesStr);
+CssProperties parseProperties(const QByteArray &propertiesStr);
 
 #endif

@@ -144,11 +144,9 @@ QString HtmlWriter::exportBlock(const QTextBlock &block)
     return lineHtml;
 }
 
-/*
- * Build HTML for a block (paragraph, heading, or list item).
+/* Build HTML for a block (paragraph, heading, or list item).
  * Uses the open_tags stack to track which tags are open.
- * Uses inline CSS to represent indent via margin-left.
-*/
+ * Uses inline CSS to represent indent via margin-left. */
 QString HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
 {
     const QTextBlockFormat blockFormat = block.blockFormat();

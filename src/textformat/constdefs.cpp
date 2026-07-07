@@ -72,10 +72,8 @@ const QColor &horizontalRulerColor()
     return hrc;
 }
 
-/*
- * Sets up properties for a QTextBlockFormat that is used each time
- * a new block is added to a QTextDocument in TextEditor.
- */
+/* Set up properties for a QTextBlockFormat that is used each time
+ * a new block is added to a QTextDocument in TextEditor. */
 const QTextBlockFormat &defaultBlockFormat()
 {
     // Define aliases

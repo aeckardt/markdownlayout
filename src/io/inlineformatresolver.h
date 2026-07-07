@@ -38,8 +38,7 @@ struct ExportableFragment {
     QVector<FormatChange> formatChanges;
 };
 
-/*
- * InlineFormatResolver is a helper class to export a QTextBlock into HTML and Markdown.
+/* InlineFormatResolver is a helper class to export a QTextBlock into HTML and Markdown.
  * It organizes the nested char formats in the fragments such that the inner/outer tags
  * don't conflict. For instance, we want to avoid output like this:
  *
@@ -49,8 +48,7 @@ struct ExportableFragment {
  * to get the output right.
  * Therefore, InlineFormatResolver organizes the format differences between fragments such
  * that it's clear which format has to be the outer and which one the inner.
- * If both cases are equally possible, there is a precedence list which one takes priority.
- */
+ * If both cases are equally possible, there is a precedence list which one takes priority. */
 class InlineFormatResolver {
 public:
     InlineFormatResolver(const QTextBlock &block, int start = -1, int end = -1);

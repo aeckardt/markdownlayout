@@ -6,10 +6,10 @@
 #include <QTextDocument>
 
 #include "documentlayout/markdownlayout.h"
-#include "io/htmlwriter.h"
 #include "io/htmlimporter.h"
-#include "io/markdownwriter.h"
+#include "io/htmlwriter.h"
 #include "io/markdownimporter.h"
+#include "io/markdownwriter.h"
 #include "texteditor/texteditor.h"
 #include "texteditor/texteditorwidget.h"
 
@@ -17,7 +17,7 @@
 
 static const char *markdownString =
         "# 1. Überschrift\n\n"
-        "* Listenpunkt 1\n"
+        "* <ins>Listenpunkt 1</ins>\n"
         "* Listenpunkt 2\n"
         "  - eingerückter Listenpunkt mit Dash\n"
         "* Listenpunkt 3\n"
