@@ -63,10 +63,10 @@ bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
 
     if (style.contains("font-style")) {
         const QString raw = style.value("font-style").trimmed().toLower();
-        if (raw == QStringLiteral("italic") || raw == QStringLiteral("oblique")) {
+        if (raw == "italic" || raw == "oblique") {
             charFmt.setFontItalic(true);
             changed = true;
-        } else if (raw == QStringLiteral("normal")) {
+        } else if (raw == "normal") {
             charFmt.setFontItalic(false);
             changed = true;
         } else
@@ -75,10 +75,10 @@ bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
 
     if (style.contains("text-decoration")) {
         const QString raw = style.value("text-decoration").trimmed().toLower();
-        if (raw == QStringLiteral("underline")) {
+        if (raw == "underline") {
             charFmt.setFontUnderline(true);
             changed = true;
-        } else if (raw.contains(QStringLiteral("none"))) {
+        } else if (raw.contains("none")) {
             charFmt.setFontUnderline(false);
             changed = true;
         } else

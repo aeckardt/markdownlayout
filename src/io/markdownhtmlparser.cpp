@@ -26,38 +26,38 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
     // At m_pos there is a "<".
 
     // Advance past '<'
-    int fwdPos = m_pos + 1;
-    if (fwdPos >= m_length)
+    ++m_pos;
+    if (m_pos >= m_length)
         return {};
 
     // Look for optional closing slash
-    const bool closingTag = m_input.at(fwdPos) == '/';
+    const bool closingTag = m_input.at(m_pos) == '/';
     if (closingTag)
-        ++fwdPos;
-    if (fwdPos >= m_length)
+        ++m_pos;
+    if (m_pos >= m_length)
         return {};
 
     // Read tag name
     // Note: Whitespaces before the tag name are not allowed
-    const QByteArray tagName = readIdentifier(fwdPos);
-    if (tagName.isEmpty())
+    QByteArray tagName;
+    if (!readIdentifier(tagName))
         return {};
 
     // Consume whitespaces
-    skipWhitespaces(fwdPos);
-    if (fwdPos >= m_length)
+    skipWhitespaces();
+    if (m_pos >= m_length)
         // Return if the input has ended unexpectedly
         return {};
 
     // If the tag is also closing tag, check for '>'
     if (closingTag) {
-        if (m_input.at(fwdPos) == '>') {
+        if (m_input.at(m_pos) == '>') {
             // Valid closing tag found!
             // Advance position for parser
             HtmlScopePtr scope = HtmlScope::createPtr(
                         tagName,
                         HtmlScope::CloseTag);
-            m_pos = fwdPos + 1;
+            m_pos = m_pos + 1;
             return scope;
         }
         // Condition for valid closing tag violated
@@ -67,49 +67,46 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
 
     // Parse attributes or end of tag
     CssProperties attrs;
-    while (fwdPos < m_length) {
-        char ch = m_input.at(fwdPos);
+    while (m_pos < m_length) {
+        char ch = m_input.at(m_pos);
         if (isHtmlSpace(ch))
-            ++fwdPos;
+            ++m_pos;
         else if (isAlpha(ch)) {
             // Parse attribute
             // Read attribute name
-            const QByteArray attrName = readIdentifier(fwdPos);
-            if (attrName.isEmpty())
+            QByteArray attrName;
+            if (!readIdentifier(attrName))
                 return {};
 
             // Consume whitespaces
-            skipWhitespaces(fwdPos);
-            if (fwdPos >= m_length)
+            skipWhitespaces();
+            if (m_pos >= m_length)
                 return {};
 
             // Check for equality sign
             QByteArray attrValue;
-            if (m_input.at(fwdPos) == '=') {
-                ++fwdPos;
+            if (m_input.at(m_pos) == '=') {
+                ++m_pos;
 
                 // Consume whitespaces
-                skipWhitespaces(fwdPos);
-                if (fwdPos >= m_length)
+                skipWhitespaces();
+                if (m_pos >= m_length)
                     return {};
 
-                bool ok;
-                QByteArray value = readAttributeValue(fwdPos, ok);
-                if (!ok)
+                if (!readAttributeValue(attrValue))
                     return {};
-
-                attrValue = value;
             }
+            // An empty attrValue can be interpreted as "true" for boolean fields
             attrs.insert(attrName, attrValue);
         } else if (ch == '/') {
             // Self closing tag
-            if (fwdPos + 1 < m_length && m_input.at(fwdPos + 1) == '>') {
+            if (m_pos + 1 < m_length && m_input.at(m_pos + 1) == '>') {
                 // Valid self closing tag found!
                 HtmlScopePtr scope = HtmlScope::createPtr(
                             tagName,
                             HtmlScope::SelfClosingTag,
                             attrs);
-                m_pos = fwdPos + 2;
+                m_pos = m_pos + 2;
                 return scope;
             }
             return {};
@@ -119,7 +116,7 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
                         tagName,
                         HtmlScope::OpenTag,
                         attrs);
-            m_pos = fwdPos + 1;
+            m_pos = m_pos + 1;
             return scope;
         } else
             // Other characters are not allowed here:
@@ -129,76 +126,70 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
     return {};
 }
 
-QByteArray MarkdownHtmlParser::readIdentifier(int &fwdPos) const
+bool MarkdownHtmlParser::readIdentifier(QByteArray &identifier)
 {
-    // Read name
-    QByteArray identifier;
-    identifier += m_input.at(fwdPos);
+    // Read first character
+    identifier = QByteArray(1, m_input.at(m_pos));
 
     // The identifier needs to start with an alphabetic character
     if (!isAlpha(identifier.at(0)))
-        return {};
-    ++fwdPos;
-    while (fwdPos < m_length) {
+        return false;
+
+    ++m_pos;
+    while (m_pos < m_length) {
         static constexpr QByteArrayView specialChars("-_:");
-        const char ch = m_input.at(fwdPos);
+        const char ch = m_input.at(m_pos);
         if (isAlphaNumeric(ch) || specialChars.contains(ch)) {
             identifier += ch;
-            ++fwdPos;
+            ++m_pos;
         } else
             break;
     }
-    if (fwdPos >= m_length)
+    if (m_pos >= m_length)
         // If the end of the input has been reached, there is no valid HTML tag
-        // Therefore return empty string
-        return {};
-    return identifier;
+        return false;
+
+    return true;
 }
 
-void MarkdownHtmlParser::skipWhitespaces(int &fwdPos) const
+void MarkdownHtmlParser::skipWhitespaces()
 {
-    while (fwdPos < m_length) {
-        const char ch = m_input.at(fwdPos);
+    while (m_pos < m_length) {
+        const char ch = m_input.at(m_pos);
         if (isHtmlSpace(ch))
-            ++fwdPos;
+            ++m_pos;
         else
             break;
     }
 }
 
-QByteArray MarkdownHtmlParser::readAttributeValue(int &fwdPos, bool &ok) const
+bool MarkdownHtmlParser::readAttributeValue(QByteArray &value)
 {
-    QByteArray value;
-    const char ch = m_input.at(fwdPos);
+    const char ch = m_input.at(m_pos);
     if (ch == '"' || ch == '\'') {
         const char quotType = ch;
-        ++fwdPos;
-        while (fwdPos < m_length && m_input.at(fwdPos) != quotType) {
-            value += m_input.at(fwdPos);
-            ++fwdPos;
+        ++m_pos;
+        while (m_pos < m_length && m_input.at(m_pos) != quotType) {
+            value += m_input.at(m_pos);
+            ++m_pos;
         }
-        if (fwdPos >= m_length) {
-            ok = false;
-            return {};
-        }
-        ++fwdPos;
+        if (m_pos >= m_length)
+            return false;
+        ++m_pos;
     } else {
-        while (fwdPos < m_length) {
+        while (m_pos < m_length) {
             static constexpr QByteArrayView delimiterChars("><\"'`=");
-            const char ch = m_input.at(fwdPos);
-            if (isSpace(ch) || delimiterChars.contains(ch))
+            const char ch = m_input.at(m_pos);
+            if (isHtmlSpace(ch) || delimiterChars.contains(ch))
                 break;
             value += ch;
-            ++fwdPos;
+            ++m_pos;
         }
-        if (value.isEmpty()) {
-            ok = false;
-            return {};
-        }
+        if (value.isEmpty())
+            return false;
     }
 
-    ok = true;
-    return value;
+    return true;
 }
 
 static inline bool isAlpha(const char ch)

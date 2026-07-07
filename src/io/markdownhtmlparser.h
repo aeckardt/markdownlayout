@@ -43,9 +43,9 @@ private:
     explicit MarkdownHtmlParser(const QByteArray &html);
 
     HtmlScopePtr tryParseHtmlTag();
-    QByteArray readIdentifier(int &fwdPos) const;
-    void skipWhitespaces(int &fwdPos) const;
-    QByteArray readAttributeValue(int &fwdPos, bool &ok) const;
+    bool readIdentifier(QByteArray &identifier);
+    void skipWhitespaces();
+    bool readAttributeValue(QByteArray &value);
 
     int m_pos;
     int m_length;
