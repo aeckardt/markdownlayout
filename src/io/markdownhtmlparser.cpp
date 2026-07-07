@@ -47,7 +47,7 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
         if (m_input.at(fwdPos) == QLatin1Char('>')) {
             // Valid closing tag found!
             // Advance position for parser
-            HtmlScopePtr scope = HtmlScope::makeScope(
+            HtmlScopePtr scope = HtmlScope::makeShared(
                         tagName,
                         HtmlScope::CloseTag);
             m_pos = fwdPos + 1;
@@ -111,7 +111,7 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
             // Self closing tag
             if (fwdPos + 1 < m_length && m_input.at(fwdPos + 1) == QLatin1Char('>')) {
                 // Valid self closing tag found!
-                HtmlScopePtr scope = HtmlScope::makeScope(
+                HtmlScopePtr scope = HtmlScope::makeShared(
                             tagName,
                             HtmlScope::SelfClosingTag,
                             attrs);
@@ -121,7 +121,7 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
             return {};
         } else if (ch == QLatin1Char('>')) {
             // Closing tag found
-            HtmlScopePtr scope = HtmlScope::makeScope(
+            HtmlScopePtr scope = HtmlScope::makeShared(
                         tagName,
                         HtmlScope::OpenTag,
                         attrs);
@@ -135,25 +135,32 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
     return {};
 }
 
+static inline bool isAlpha(char ch)
+{
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+}
+
+static inline bool isAlphaNumeric(char ch)
+{
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
+}
+
 QByteArray MarkdownHtmlParser::readIdentifier(int &fwdPos) const
 {
     // Read name
     QByteArray identifier;
     identifier += m_input.at(fwdPos);
 
-    QChar ch = QChar(identifier.at(0));
+    char ch = identifier.at(0);
 
     // The identifier needs to start with an alphabetic character
-    if (!ch.isLetter())
+    if (!isAlpha(ch))
         return {};
     ++fwdPos;
-    ch = m_input.at(fwdPos);
-    while (fwdPos < m_length && (ch.isLetterOrNumber() ||
-                                 QStringLiteral("-_:").contains(ch))) {
+    while (fwdPos < m_length && (isAlphaNumeric(ch) ||
+                                 QStringLiteral("-_:").contains(m_input.at(fwdPos)))) {
         identifier += m_input.at(fwdPos);
         ++fwdPos;
-        if (fwdPos < m_length)
-            ch = m_input.at(fwdPos);
     }
     if (fwdPos >= m_length)
         // If the end of the input has been reached, there is no valid HTML tag

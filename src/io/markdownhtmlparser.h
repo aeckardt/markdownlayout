@@ -18,7 +18,7 @@ public:
         SelfClosingTag
     };
 
-    static HtmlScopePtr makeScope(const QByteArray &tag, Type type, const CssProperties &attrs = {})
+    static HtmlScopePtr makeShared(const QByteArray &tag, Type type, const CssProperties &attrs = {})
     { return HtmlScopePtr(new HtmlScope(tag, type, attrs)); }
 
     QByteArray tag() const { return m_tag; }
