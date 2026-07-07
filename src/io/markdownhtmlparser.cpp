@@ -151,13 +151,11 @@ QByteArray MarkdownHtmlParser::readIdentifier(int &fwdPos) const
     QByteArray identifier;
     identifier += m_input.at(fwdPos);
 
-    char ch = identifier.at(0);
-
     // The identifier needs to start with an alphabetic character
-    if (!isAlpha(ch))
+    if (!isAlpha(identifier.at(0)))
         return {};
     ++fwdPos;
-    while (fwdPos < m_length && (isAlphaNumeric(ch) ||
+    while (fwdPos < m_length && (isAlphaNumeric(m_input.at(fwdPos)) ||
                                  QStringLiteral("-_:").contains(m_input.at(fwdPos)))) {
         identifier += m_input.at(fwdPos);
         ++fwdPos;
