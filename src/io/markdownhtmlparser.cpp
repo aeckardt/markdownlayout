@@ -184,9 +184,9 @@ QByteArray MarkdownHtmlParser::readAttributeValue(int &fwdPos, bool &ok) const
         ++fwdPos;
     } else {
         while (fwdPos < m_length) {
-            static constexpr QByteArrayView delimiterChars("><\"\'`=");
+            static constexpr QByteArrayView delimiterChars("><\"'`=");
             const char ch = m_input.at(fwdPos);
-            if (delimiterChars.contains(ch))
+            if (isSpace(ch) || delimiterChars.contains(ch))
                 break;
             value += ch;
             ++fwdPos;
