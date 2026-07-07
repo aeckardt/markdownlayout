@@ -1,9 +1,11 @@
 #include "markdownhtmlparser.h"
 
+#include <QByteArrayView>
+
 // Define parsing helpers
 static bool isAlpha(const char ch);
 static bool isAlphaNumeric(const char ch);
-static bool isSpace(const char ch);
+static bool isHtmlSpace(const char ch);
 
 HtmlScopePtr MarkdownHtmlParser::parseTag(const QByteArray &html)
 {
@@ -29,7 +31,7 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
         return {};
 
     // Look for optional closing slash
-    const bool closingTag = m_input.at(fwdPos) == QLatin1Char('/');
+    const bool closingTag = m_input.at(fwdPos) == '/';
     if (closingTag)
         ++fwdPos;
     if (fwdPos >= m_length)
@@ -49,7 +51,7 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
 
     // If the tag is also closing tag, check for '>'
     if (closingTag) {
-        if (m_input.at(fwdPos) == QLatin1Char('>')) {
+        if (m_input.at(fwdPos) == '>') {
             // Valid closing tag found!
             // Advance position for parser
             HtmlScopePtr scope = HtmlScope::createPtr(
@@ -66,10 +68,10 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
     // Parse attributes or end of tag
     CssProperties attrs;
     while (fwdPos < m_length) {
-        QChar ch = m_input.at(fwdPos);
-        if (ch.isSpace())
+        char ch = m_input.at(fwdPos);
+        if (isHtmlSpace(ch))
             ++fwdPos;
-        else if (ch.isLetter()) {
+        else if (isAlpha(ch)) {
             // Parse attribute
             // Read attribute name
             const QByteArray attrName = readIdentifier(fwdPos);
@@ -83,7 +85,7 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
 
             // Check for equality sign
             QByteArray attrValue;
-            if (m_input.at(fwdPos) == QLatin1Char('=')) {
+            if (m_input.at(fwdPos) == '=') {
                 ++fwdPos;
 
                 // Consume whitespaces
@@ -93,8 +95,8 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
 
                 QByteArray value;
                 ch = m_input.at(fwdPos);
-                if (QStringLiteral("\"'").contains(ch)) {
-                    QChar quotType = ch;
+                if (ch == '"' || ch == '\'') {
+                    const char quotType = ch;
                     ++fwdPos;
                     while (fwdPos < m_length && m_input.at(fwdPos) != quotType) {
                         value += m_input.at(fwdPos);
@@ -112,9 +114,9 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
                 attrValue = value;
             }
             attrs.insert(attrName, attrValue);
-        } else if (ch == QLatin1Char('/')) {
+        } else if (ch == '/') {
             // Self closing tag
-            if (fwdPos + 1 < m_length && m_input.at(fwdPos + 1) == QLatin1Char('>')) {
+            if (fwdPos + 1 < m_length && m_input.at(fwdPos + 1) == '>') {
                 // Valid self closing tag found!
                 HtmlScopePtr scope = HtmlScope::createPtr(
                             tagName,
@@ -124,7 +126,7 @@ HtmlScopePtr MarkdownHtmlParser::tryParseHtmlTag()
                 return scope;
             }
             return {};
-        } else if (ch == QLatin1Char('>')) {
+        } else if (ch == '>') {
             // Closing tag found
             HtmlScopePtr scope = HtmlScope::createPtr(
                         tagName,
@@ -170,7 +172,7 @@ void MarkdownHtmlParser::skipWhitespaces(int &fwdPos) const
 {
     while (fwdPos < m_length) {
         const char ch = m_input.at(fwdPos);
-        if (isSpace(ch))
+        if (isHtmlSpace(ch))
             ++fwdPos;
         else
             break;
@@ -202,7 +204,7 @@ static inline bool isAlphaNumeric(const char ch)
     return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
 }
 
-static inline bool isSpace(const char ch)
+static inline bool isHtmlSpace(const char ch)
 {
-    return ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t';
+    return ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t' || ch == '\f';
 }
