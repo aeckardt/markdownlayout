@@ -4,8 +4,7 @@
 #include <QFont>
 #include <QHash>
 #include <QList>
-#include <QRegularExpression>
-#include <QTextCharFormat>
+#include <QTextFormat>
 
 struct CssFloat {
     double value;
@@ -20,7 +19,7 @@ bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
 
     if (style.contains("font-size")) {
         CssFloat fontSize;
-        const QByteArray raw = style.value("font-size");
+        const QByteArray raw = style.value("font-size").toLower();
         if (parseCssFloat(raw, fontSize)) {
             if (fontSize.unit == "pt") {
                 charFmt.setFontPointSize(fontSize.value);
@@ -129,7 +128,7 @@ CssProperties parseProperties(const QByteArray &propertiesStr)
 
 static bool parseCssFloat(const QByteArray &raw, CssFloat &f)
 {
-    const QByteArray normalized = raw.trimmed().toLower();
+    const QByteArray normalized = raw.trimmed();
     if (normalized.isEmpty())
         return false;
 
