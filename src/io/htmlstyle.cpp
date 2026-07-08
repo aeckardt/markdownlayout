@@ -7,17 +7,29 @@
 #include <QRegularExpression>
 #include <QTextCharFormat>
 
+struct CssFloat {
+    double value;
+    QByteArray unit;
+};
+
+static bool parseCssFloat(const QByteArray &raw, CssFloat &f);
+
 bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
 {
     bool changed = false;
 
     if (style.contains("font-size")) {
-        const QByteArray raw = style.value("font-size").trimmed();
-        static const QRegularExpression numberRe(QStringLiteral("^(\\d+)"));
-        const auto match = numberRe.match(raw);
-        if (match.hasMatch()) {
-            charFmt.setFontPointSize(match.captured(1).toInt());
-            changed = true;
+        CssFloat fontSize;
+        const QByteArray raw = style.value("font-size");
+        if (parseCssFloat(raw, fontSize)) {
+            if (fontSize.unit == "pt") {
+                charFmt.setFontPointSize(fontSize.value);
+                changed = true;
+            }
+            if (fontSize.unit == "px") {
+                charFmt.setProperty(QTextFormat::FontPixelSize, int(fontSize.value));
+                changed = true;
+            }
         } else {
             static const QHash<QByteArray, int> namedSizes {
                 {"xx-small", 8},
@@ -28,7 +40,7 @@ bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
                 {"x-large", 16},
                 {"xx-large", 18},
             };
-            const auto size = namedSizes.value(raw.toLower(), -1);
+            const auto size = namedSizes.value(raw, -1);
             if (size > 0) {
                 charFmt.setFontPointSize(size);
                 changed = true;
@@ -62,7 +74,7 @@ bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
     }
 
     if (style.contains("font-style")) {
-        const QString raw = style.value("font-style").trimmed().toLower();
+        const QByteArray raw = style.value("font-style").trimmed().toLower();
         if (raw == "italic" || raw == "oblique") {
             charFmt.setFontItalic(true);
             changed = true;
@@ -74,7 +86,7 @@ bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
     }
 
     if (style.contains("text-decoration")) {
-        const QString raw = style.value("text-decoration").trimmed().toLower();
+        const QByteArray raw = style.value("text-decoration").trimmed().toLower();
         if (raw == "underline") {
             charFmt.setFontUnderline(true);
             changed = true;
@@ -113,4 +125,35 @@ CssProperties parseProperties(const QByteArray &propertiesStr)
     }
 
     return properties;
+}
+
+static bool parseCssFloat(const QByteArray &raw, CssFloat &f)
+{
+    const QByteArray normalized = raw.trimmed().toLower();
+    if (normalized.isEmpty())
+        return false;
+
+    int pos = 0;
+    while (pos < normalized.size() && normalized.at(pos) >= '0' && normalized.at(pos) <= '9')
+        ++pos;
+
+    if (pos == 0)
+        return false;
+
+    if (pos < normalized.size() && normalized.at(pos) == '.') {
+        ++pos;
+        while (pos < normalized.size() && normalized.at(pos) >= '0' && normalized.at(pos) <= '9')
+            ++pos;
+    }
+
+    bool ok = false;
+    const double value = normalized.left(pos).toDouble(&ok);
+    if (!ok)
+        return false;
+
+    const QByteArray unit = normalized.mid(pos).trimmed();
+
+    f.value = value;
+    f.unit = unit;
+    return true;
 }
