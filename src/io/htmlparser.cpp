@@ -1,13 +1,30 @@
 #include "htmlparser.h"
 
 #include <QByteArrayView>
+#include <QHash>
 
 // Define parsing helpers
 static bool isAlpha(const char ch);
 static bool isAlphaNumeric(const char ch);
 static bool isHtmlSpace(const char ch);
+static int hexDigitValue(char ch);
 static void appendUtf8CodePoint(QByteArray &out, uint codePoint);
-static QByteArray htmlUnescape(const QByteArray &text);
+static bool parseCodePoint(const QByteArrayView &text, int base, uint &codePoint);
+static QByteArray htmlUnescape(const QByteArrayView &text);
+
+HtmlNode::~HtmlNode()
+{
+    switch (m_type) {
+    case Type::HtmlTag:
+        delete static_cast<HtmlTagPtr *>(m_data);
+        break;
+    case Type::Text:
+        delete static_cast<QByteArray *>(m_data);
+        break;
+    default:
+        ;
+    }
+}
 
 HtmlParser::HtmlParser(const QByteArray &html)
     : m_input(html),
@@ -20,66 +37,60 @@ HtmlParser::HtmlParser(const QByteArray &html)
 
 HtmlNodePtr HtmlParser::parse()
 {
-    // Initialize data
     m_astRoot = HtmlNode::createContainer();
     m_currentParent = m_astRoot;
     m_openScopeStack.clear();
 
     m_pos = 0;
     m_length = m_input.size();
-    m_text.clear();
+    m_textLength = 0;
 
     // Iterate through input string
     while (m_pos < m_length) {
-        const char ch = m_input.at(m_pos);
-        switch (ch) {
-        case '<': {
+        if (m_input.at(m_pos) == '<') {
             flushText();
 
             // Try to parse HTML tag
-            int start = m_pos;
             HtmlTagPtr tag = parseTag();
             if (!tag) {
-                m_text += ch;
                 ++m_pos;
+                ++m_textLength;
                 continue;
             }
 
-            int length = m_pos - start;
-            HtmlNodePtr marker = HtmlNode::createHtmlTag(start, length, tag);
+            HtmlNodePtr node = HtmlNode::createHtmlTag(tag);
 
             switch (tag->type()) {
             case HtmlTag::OpenTag:
-                pushScopeMarker(marker);
+                pushScopeTag(node);
                 break;
             case HtmlTag::CloseTag: {
-                HtmlNodePtr openMarker = findOpeningMarker(marker);
-                if (!openMarker) {
-                    integrateMarkerAsText(marker);
+                HtmlNodePtr openNode = findOpeningTag(node);
+                if (!openNode) {
+                    flattenNode(node);
                     continue;
                 }
-                integrateNode(openMarker);
+                integrateNode(openNode);
                 break;
             }
             case HtmlTag::SelfClosingTag:
-                integrateNode(marker);
+                integrateNode(node);
                 break;
             default:
                 ;
             }
 
             continue;
-        }
-        default:
-            m_text += ch;
+        } else {
             ++m_pos;
+            ++m_textLength;
         }
     }
 
     flushText();
     while (!m_openScopeStack.isEmpty()) {
-        HtmlNodePtr marker = popScopeMarker();
-        integrateMarkerAsText(marker);
+        HtmlNodePtr node = popScopeTag();
+        flattenNode(node);
     }
 
     return m_astRoot;
@@ -258,13 +269,13 @@ bool HtmlParser::readAttributeValue(int &fwdPos, QByteArray &value)
     return true;
 }
 
-HtmlNodePtr HtmlParser::findOpeningMarker(HtmlNodePtr marker)
+HtmlNodePtr HtmlParser::findOpeningTag(HtmlNodePtr node)
 {
     int index = m_openScopeStack.size() - 1;
     while (index >= 0) {
-        const HtmlNodePtr &openMarker = m_openScopeStack[index];
-        const QByteArray &openTag = openMarker->tag()->name();
-        const QByteArray &closeTag = marker->tag()->name();
+        const HtmlNodePtr &openNode = m_openScopeStack[index];
+        const QByteArray openTag = openNode->tag()->name();
+        const QByteArray closeTag = node->tag()->name();
         if (openTag == closeTag)
             break;
         --index;
@@ -273,25 +284,25 @@ HtmlNodePtr HtmlParser::findOpeningMarker(HtmlNodePtr marker)
         return {};
 
     while (true) {
-        HtmlNodePtr poppedMarker = popScopeMarker();
-        const QString &poppedTag = poppedMarker->tag()->name();
-        const QString &closeTag = marker->tag()->name();
+        HtmlNodePtr poppedNode = popScopeTag();
+        const QByteArray poppedTag = poppedNode->tag()->name();
+        const QByteArray closeTag = node->tag()->name();
         if (poppedTag == closeTag)
-            return poppedMarker;
+            return poppedNode;
 
-        // Interpret un-matched markers as text
-        integrateMarkerAsText(poppedMarker);
+        // Remove un-matched node
+        flattenNode(poppedNode);
     }
 }
-void HtmlParser::pushScopeMarker(HtmlNodePtr marker)
+void HtmlParser::pushScopeTag(HtmlNodePtr node)
 {
-    m_currentParent = marker;
+    m_currentParent = node;
 
-    // Push marker to the stack
-    m_openScopeStack.append(marker);
+    // Push node to the stack
+    m_openScopeStack.append(node);
 }
 
-HtmlNodePtr HtmlParser::popScopeMarker()
+HtmlNodePtr HtmlParser::popScopeTag()
 {
     HtmlNodePtr popped = m_openScopeStack.pop();
 
@@ -310,37 +321,27 @@ void HtmlParser::integrateNode(HtmlNodePtr node)
     m_currentParent->children().append(node);
 }
 
-void HtmlParser::integrateMarkerAsText(HtmlNodePtr marker)
+void HtmlParser::flattenNode(HtmlNodePtr node)
 {
-    // Append text node with marker characters to the tree
-    integrateNode(HtmlNode::createText(marker->start(), marker->length()));
+    // TODO: Export node text content if appropriate
 
     // Flatten the structure by moving all the children from the floating
-    // marker node to the current parent node
-    HtmlNodePtr node = m_currentParent;
-    node->children() += std::move(marker->children());
-    marker->children().clear();
+    // node to the current parent node
+    m_currentParent->children() += std::move(node->children());
 
-    // The inline node from parsing is not needed anymore
-    marker.reset();
+    // The floating node could be removed now
 }
 
 void HtmlParser::flushText()
 {
-    if (m_text.isEmpty())
+    if (m_textLength == 0)
         return;
 
     // Append new text node to the tree
-    integrateNode(HtmlNode::createText(m_pos - m_text.length(), m_text.length()));
+    integrateNode(HtmlNode::createText(htmlUnescape(m_input.sliced(m_pos - m_textLength, m_textLength))));
 
     // Clear text
-    m_text.clear();
-}
-
-const QByteArray HtmlParser::text(HtmlNodePtr textNode) const
-{
-    Q_ASSERT(textNode->type() == HtmlNode::Type::Text);
-    return htmlUnescape(m_input.mid(textNode->start(), textNode->length()));
+    m_textLength = 0;
 }
 
 static inline bool isAlpha(const char ch)
@@ -356,6 +357,17 @@ static inline bool isAlphaNumeric(const char ch)
 static inline bool isHtmlSpace(const char ch)
 {
     return ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t' || ch == '\f';
+}
+
+static int hexDigitValue(char ch)
+{
+    if (ch >= '0' && ch <= '9')
+        return ch - '0';
+    if (ch >= 'a' && ch <= 'f')
+        return 10 + ch - 'a';
+    if (ch >= 'A' && ch <= 'F')
+        return 10 + ch - 'A';
+    return -1;
 }
 
 static void appendUtf8CodePoint(QByteArray &out, uint codePoint)
@@ -384,21 +396,49 @@ static void appendUtf8CodePoint(QByteArray &out, uint codePoint)
     }
 }
 
-static QByteArray htmlUnescape(const QByteArray &text)
+static bool parseCodePoint(const QByteArrayView &text, int base, uint &codePoint)
 {
-    static const QHash<QByteArray, QByteArray> namedEntities = {
+    if (text.isEmpty())
+        return false;
+
+    uint value = 0;
+
+    for (char ch : text) {
+        int digit = -1;
+
+        if (base == 10) {
+            if (ch >= '0' && ch <= '9')
+                digit = ch - '0';
+        } else if (base == 16) {
+            digit = hexDigitValue(ch);
+        }
+
+        if (digit < 0 || digit >= base)
+            return false;
+
+        if (value <= 0x10FFFF)
+            value = value * base + static_cast<uint>(digit);
+
+        if (value > 0x10FFFF)
+            value = 0x110000; // valid number syntax, invalid Unicode code point
+    }
+
+    codePoint = value;
+    return true;
+}
+
+static QByteArray htmlUnescape(const QByteArrayView &text)
+{
+    static const QHash<QByteArrayView, QByteArray> namedEntities = {
         {"amp",  "&"},
         {"lt",   "<"},
         {"gt",   ">"},
         {"quot", "\""},
         {"apos", "'"},
-        // TODO: Replace with UTF-8 sequence
-//        {"nbsp", QByteArray(QChar(0x00A0))},
-
-//        // Optional common extras:
-//        {"ndash", QByteArray(QChar(0x2013))},
-//        {"mdash", QByteArray(QChar(0x2014))},
-//        {"hellip", QByteArray(QChar(0x2026))}
+        {"nbsp",  QByteArray("\xC2\xA0", 2)},
+        {"ndash", QByteArray("\xE2\x80\x93", 3)},
+        {"mdash", QByteArray("\xE2\x80\x94", 3)},
+        {"hellip", QByteArray("\xE2\x80\xA6", 3)}
     };
 
     QByteArray out;
@@ -406,32 +446,30 @@ static QByteArray htmlUnescape(const QByteArray &text)
 
     qsizetype i = 0;
     while (i < text.size()) {
-        if (text.at(i) != QLatin1Char('&')) {
+        if (text.at(i) != '&') {
             out.append(text.at(i));
             ++i;
             continue;
         }
 
         const qsizetype semicolon = text.indexOf(';', i + 1);
-
         if (semicolon < 0) {
             out.append(text.at(i));
             ++i;
             continue;
         }
 
-        const QByteArray entity = text.mid(i + 1, semicolon - i - 1);
+        const QByteArrayView entity = text.sliced(i + 1, semicolon - i - 1);
 
         if (entity.startsWith('#')) {
             bool ok = false;
             uint codePoint = 0;
 
-            QByteArrayView entityView(entity);
-
-            if (entity.startsWith("#x") || entity.startsWith("#X"))
-                codePoint = entityView.sliced(2).toUInt(&ok, 16);
-            else
-                codePoint = entityView.sliced(1).toUInt(&ok, 10);
+            if (entity.size() >= 2 &&
+                (entity.at(1) == 'x' || entity.at(1) == 'X')) {
+                ok = parseCodePoint(entity.sliced(2), 16, codePoint);
+            } else
+                ok = parseCodePoint(entity.sliced(1), 10, codePoint);
 
             if (ok) {
                 appendUtf8CodePoint(out, codePoint);
@@ -448,7 +486,7 @@ static QByteArray htmlUnescape(const QByteArray &text)
         }
 
         // Unknown or malformed entity: keep it unchanged.
-        out.append(QByteArrayView(text).sliced(i, semicolon - i + 1));
+        out.append(text.sliced(i, semicolon - i + 1));
         i = semicolon + 1;
     }
 

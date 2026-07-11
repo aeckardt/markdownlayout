@@ -12,6 +12,7 @@ static const char *htmlString =
         "<body>"
         "<h1>A heading</h1>"
         "<p>A paragraph</p>"
+        "<invalidtag>"
         "</body>"
         "</html>";
 
@@ -27,7 +28,7 @@ void printAst(const HtmlParser &parser, const HtmlNodePtr &node, int level = 0)
     case HtmlNode::Type::Text: {
         QByteArray indent(2 * level, ' ');
         printf("%s", qUtf8Printable(indent));
-        printf("%s\n", qUtf8Printable(parser.text(node)));
+        printf("%s\n", qUtf8Printable(node->text()));
         break;
     }
     default:
