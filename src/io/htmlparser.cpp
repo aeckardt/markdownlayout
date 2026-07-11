@@ -13,20 +13,6 @@ static void appendUtf8CodePoint(QByteArray &out, uint codePoint);
 static bool parseCodePoint(const QByteArrayView &text, int base, uint &codePoint);
 static QByteArray htmlUnescape(const QByteArrayView &text);
 
-HtmlNode::~HtmlNode()
-{
-    switch (type()) {
-    case Type::HtmlTag:
-        delete std::get<HtmlTagPtr *>(m_data);
-        break;
-    case Type::Text:
-        delete std::get<QByteArray *>(m_data);
-        break;
-    default:
-        ;
-    }
-}
-
 HtmlParser::HtmlParser(const QByteArray &html)
     : m_input(html),
       m_pos(0),
@@ -332,13 +318,11 @@ void HtmlParser::integrateNode(HtmlNodePtr node)
 
 void HtmlParser::flattenNode(HtmlNodePtr node)
 {
-    // TODO: Export node text content if appropriate
-
     // Flatten the structure by moving all the children from the floating
     // node to the current parent node
     m_currentParent->children() += std::move(node->children());
 
-    // The floating node could be removed now
+    // The floating node will be removed when the reference counter drops to 0
 }
 
 void HtmlParser::flushText()

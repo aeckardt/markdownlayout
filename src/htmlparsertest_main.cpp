@@ -9,7 +9,7 @@ static const char *htmlString =
         "<html>"
         "<head>"
         "</head>"
-        "<bODy>"
+        "<BoDy>"
         "<h1>A heading</h1>"
         "<p>A paragraph</p>"
         "<invalidtag>"

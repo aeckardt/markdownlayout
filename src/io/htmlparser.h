@@ -7,6 +7,7 @@
 #include <QStack>
 #include <QVector>
 #include <memory>
+#include <variant>
 
 class HtmlTag;
 typedef std::shared_ptr<HtmlTag> HtmlTagPtr;
@@ -22,6 +23,9 @@ public:
 
     static HtmlTagPtr create(const QByteArray &tag, Type type, const CssProperties &attrs = {})
     { return HtmlTagPtr(new HtmlTag(tag, type, attrs)); }
+
+    HtmlTag(const HtmlTag &) = delete;
+    HtmlTag &operator=(const HtmlTag &) = delete;
 
     QByteArray name() const { return m_tagName; }
     Type type() const { return m_type; }
@@ -59,23 +63,23 @@ public:
 
     HtmlNode(const HtmlNode &) = delete;
     HtmlNode &operator=(const HtmlNode &) = delete;
-    ~HtmlNode();
 
     Type type() const { return static_cast<Type>(m_data.index()); }
 
-    HtmlTagPtr tag() const { Q_ASSERT(type() == Type::HtmlTag); return *std::get<HtmlTagPtr *>(m_data); }
-    QByteArray text() const { Q_ASSERT(type() == Type::Text); return *std::get<QByteArray *>(m_data); }
+    HtmlTagPtr tag() const { Q_ASSERT(type() == Type::HtmlTag); return std::get<HtmlTagPtr>(m_data); }
+    QByteArray text() const { Q_ASSERT(type() == Type::Text); return std::get<QByteArray>(m_data); }
 
     QVector<HtmlNodePtr> &children() { return m_children; }
     const QVector<HtmlNodePtr> &children() const { return m_children; }
-private:
-    HtmlNode() {}
-    HtmlNode(const HtmlTagPtr &tag, const QVector<HtmlNodePtr> &children)
-        : m_data(new HtmlTagPtr(tag)), m_children(children) {}
-    HtmlNode(const QByteArray &text)
-        : m_data(new QByteArray(text)) {}
 
-    std::variant<nullptr_t, HtmlTagPtr *, QByteArray *> m_data;
+private:
+    HtmlNode() = default;
+    HtmlNode(const HtmlTagPtr &tag, const QVector<HtmlNodePtr> &children)
+        : m_data(tag), m_children(children) {}
+    HtmlNode(const QByteArray &text)
+        : m_data(text) {}
+
+    std::variant<std::monostate, HtmlTagPtr, QByteArray> m_data;
     QVector<HtmlNodePtr> m_children;
 };
 
