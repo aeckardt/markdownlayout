@@ -91,6 +91,8 @@ public:
     HtmlNodePtr parse();
     HtmlTagPtr parseTag();
 
+    HtmlNodePtr findNode(const HtmlNodePtr &root, const QByteArray &tagName);
+
 private:
     bool readIdentifier(int &fwdPos, QByteArray &identifier);
     void skipWhitespaces(int &fwdPos);

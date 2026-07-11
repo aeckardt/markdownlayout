@@ -214,9 +214,9 @@ void TextEditor::copyAsMarkdown()
     QMimeData *mimeData = new QMimeData;
 
     // Export text as Markdown
-    QString markdown = markdownFromDocument(document());
+    QByteArray markdown = markdownFromDocument(document());
     mimeData->setText(markdown);
-    mimeData->setData("text/markdown", markdown.toUtf8());
+    mimeData->setData("text/markdown", markdown);
 
     QGuiApplication::clipboard()->setMimeData(mimeData);
 }
@@ -228,7 +228,7 @@ void TextEditor::paste()
 
     const QMimeData *mimeData = QGuiApplication::clipboard()->mimeData();
     if (mimeData->hasHtml()) {
-        QTextDocument *contentDoc = documentFromHtml(mimeData->html());
+        QTextDocument *contentDoc = documentFromHtml(mimeData->data("text/html"));
         fragment = QTextDocumentFragment(contentDoc);
     } else {
         QString text = mimeData->text();

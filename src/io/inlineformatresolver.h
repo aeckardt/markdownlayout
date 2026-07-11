@@ -1,7 +1,7 @@
 #ifndef INLINEFORMATRESOLVER_H
 #define INLINEFORMATRESOLVER_H
 
-#include <QMap>
+#include <QHash>
 #include <QTextBlock>
 #include <QTextCharFormat>
 #include <QTextFragment>
@@ -19,17 +19,17 @@ struct InlineFormat {
     Type type;
     int start;
     int end;
-    QMap<QString, QString> attrs;
+    QHash<QByteArray, QByteArray> attrs;
 
     InlineFormat(Type type, int start, int end = -1)
-        : type(type), start(start), end(end), attrs(QMap<QString, QString>()) {}
-    InlineFormat(Type type, int start, int end, QMap<QString, QString> attrs)
+        : type(type), start(start), end(end), attrs(QHash<QByteArray, QByteArray>()) {}
+    InlineFormat(Type type, int start, int end, QHash<QByteArray, QByteArray> attrs)
         : type(type), start(start), end(end), attrs(attrs) {}
 };
 
 struct FormatChange {
     InlineFormat::Type type;
-    QMap<QString, QString> attrs;
+    QHash<QByteArray, QByteArray> attrs;
     bool open;
 };
 

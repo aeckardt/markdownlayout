@@ -3,8 +3,8 @@
 #include "3rdparty/md4c/md4c.h"
 #include "textformat/blocktypes.h"
 #include "textformat/constdefs.h"
+#include "htmlparser.h"
 #include "htmlstyle.h"
-#include "markdownhtmlparser.h"
 
 #include <QByteArray>
 #include <QRegularExpression>
@@ -35,8 +35,8 @@ private:
     explicit MarkdownRenderer(QTextCursor *cursor);
 
     // HTML handlers
-    void enterHtml(const HtmlScopePtr &scope);
-    void leaveHtml(const HtmlScopePtr &scope);
+    void enterHtml(const HtmlTagPtr &scope);
+    void leaveHtml(const HtmlTagPtr &scope);
 
     // Render functions
     void insertBlock();
@@ -57,7 +57,7 @@ private:
     bool m_newListItem;
     QStack<TextList> m_listStack;
     int m_blockQuoteLevel;
-    QStack<HtmlScopePtr> m_htmlScopeStack;
+    QStack<HtmlTagPtr> m_htmlScopeStack;
 
     QFont m_monoFont;
 };
@@ -371,19 +371,20 @@ int MarkdownRenderer::cbText(int textType, const char *text, unsigned int size)
         m_cursor->insertText(QString(QChar(0xFFFD)), m_charFmtStack.top());
         break;
     case MD_TEXT_HTML: {
-        HtmlScopePtr htmlScope = MarkdownHtmlParser::parseTag(QByteArray(text, size));
+        HtmlParser parser(QByteArray(text, size));
+        HtmlTagPtr htmlScope = parser.parseTag();
         if (!htmlScope)
             // No HTML tag identified
             // -> Warn or ignore
             break;
         switch (htmlScope->type()) {
-        case HtmlScope::OpenTag:
+        case HtmlTag::OpenTag:
             enterHtml(htmlScope);
             break;
-        case HtmlScope::CloseTag:
+        case HtmlTag::CloseTag:
             leaveHtml(htmlScope);
             break;
-        case HtmlScope::SelfClosingTag:
+        case HtmlTag::SelfClosingTag:
             enterHtml(htmlScope);
             leaveHtml(htmlScope);
             break;
@@ -408,9 +409,9 @@ int MarkdownRenderer::cbText(int textType, const char *text, unsigned int size)
     return 0;  // no error
 }
 
-void MarkdownRenderer::enterHtml(const HtmlScopePtr &scope)
+void MarkdownRenderer::enterHtml(const HtmlTagPtr &scope)
 {
-    const QByteArray tag = scope->tag().toLower();
+    const QByteArray &tag = scope->name();
     if (tag == "ins") {
         QTextCharFormat underlineFmt(m_charFmtStack.top());
         underlineFmt.setFontUnderline(true);
@@ -423,13 +424,13 @@ void MarkdownRenderer::enterHtml(const HtmlScopePtr &scope)
     m_htmlScopeStack.push(scope);
 }
 
-void MarkdownRenderer::leaveHtml(const HtmlScopePtr &scope)
+void MarkdownRenderer::leaveHtml(const HtmlTagPtr &scope)
 {
-    if (m_htmlScopeStack.empty() || m_htmlScopeStack.top()->tag() != scope->tag())
+    if (m_htmlScopeStack.empty() || m_htmlScopeStack.top()->name() != scope->name())
         // Closing tag has no matching opening tag
         // -> Warn or ignore
         return;
-    const QByteArray tag = scope->tag().toLower();
+    const QByteArray tag = scope->name();
     if (tag == "ins" || tag == "span")
         m_charFmtStack.pop();
     m_htmlScopeStack.pop();

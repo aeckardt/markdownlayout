@@ -3,7 +3,7 @@
 #include "inlineformatresolver.h"
 #include "textformat/constdefs.h"
 
-#include <QRegularExpression>
+#include <QByteArray>
 #include <QTextBlock>
 #include <QTextFormat>
 #include <QTextList>
@@ -15,12 +15,12 @@ class MarkdownWriter
 {
 public:
     MarkdownWriter(QTextDocument *document, const QTextCursor *range);
-    QString exportAll();
+    QByteArray exportAll();
 
 private:
-    QString exportBlock(const QTextBlock &block);
-    QPair<QString, int> exportFragment(const ExportableFragment &fragment,
-                                       int headingLevel = 0);
+    QByteArray exportBlock(const QTextBlock &block);
+    QPair<QByteArray, int> exportFragment(const ExportableFragment &fragment,
+                                          int headingLevel = 0);
 
     QTextDocument *m_document;
     int m_start;
@@ -39,12 +39,12 @@ MarkdownWriter::MarkdownWriter(QTextDocument *document, const QTextCursor *range
     }
 }
 
-QString MarkdownWriter::exportAll()
+QByteArray MarkdownWriter::exportAll()
 {
     if (!m_document || m_end < m_start)
         return {};
 
-    QStringList lines;
+    QByteArrayList lines;
     QTextCursor localCursor(m_document);
     localCursor.setPosition(m_start);
     QTextBlock block = localCursor.block();
@@ -54,28 +54,28 @@ QString MarkdownWriter::exportAll()
         block = block.next();
     }
 
-    return lines.join(QLatin1Char('\n'));
+    return lines.join('\n');
 }
 
-QString MarkdownWriter::exportBlock(const QTextBlock &block)
+QByteArray MarkdownWriter::exportBlock(const QTextBlock &block)
 {
     const QTextBlockFormat blockFormat = block.blockFormat();
     const int headingLevel = blockFormat.headingLevel();
     QTextList *textList = block.textList();
 
     if (blockFormat.hasProperty(QTextFormat::BlockTrailingHorizontalRulerWidth))
-        return QStringLiteral("---");
+        return "---";
 
-    QString prefix;
+    QByteArray prefix;
     if (textList)
-        prefix = QString(blockFormat.indent() * 2, QLatin1Char(' ')) + QStringLiteral("* ");
+        prefix = QByteArray(blockFormat.indent() * 2, ' ') + "* ";
     else if (headingLevel >= 1 && headingLevel <= 4)
-        prefix = QString(headingLevel, QLatin1Char('#')) + QLatin1Char(' ');
+        prefix = QByteArray(headingLevel, '#') + ' ';
     else if (blockFormat.hasProperty(QTextFormat::BlockQuoteLevel))
-        prefix = QStringLiteral("> ");
+        prefix = "> ";
 
     const auto fragments = InlineFormatResolver(block, m_start, m_end).fragments();
-    QString lineText;
+    QByteArray lineText;
 
     for (const auto &ef : fragments) {
         if (!ef.fragment.isValid())
@@ -90,11 +90,11 @@ QString MarkdownWriter::exportBlock(const QTextBlock &block)
     return prefix + lineText;
 }
 
-QPair<QString, int> MarkdownWriter::exportFragment(const ExportableFragment &ef,
+QPair<QByteArray, int> MarkdownWriter::exportFragment(const ExportableFragment &ef,
                                                      int headingLevel)
 {
     const auto fragment = ef.fragment;
-    QString text = fragment.text();
+    QByteArray text = fragment.text().toUtf8();
 
     const int sliceLeft = std::max(0, m_start - fragment.position());
     const int remaining = m_end - fragment.position() - fragment.length();
@@ -102,54 +102,65 @@ QPair<QString, int> MarkdownWriter::exportFragment(const ExportableFragment &ef,
     if (remaining < 0)
         sliceRight = std::max<int>(0, text.size() + remaining);
 
-    QString selectedText = text.mid(sliceLeft, sliceRight - sliceLeft);
-    static const QRegularExpression leadingRe(QStringLiteral("^\\s*"));
-    static const QRegularExpression trailingRe(QStringLiteral("\\s*$"));
+    QByteArray selectedText = text.mid(sliceLeft, sliceRight - sliceLeft);
 
-    const QString leading = leadingRe.match(selectedText).captured(0);
-    if (leading.size() == selectedText.size())
-        return { leading, remaining };
+    static constexpr QByteArrayView whitespaceChars(" \n\t\r");
 
-    const QString trailing = trailingRe.match(selectedText).captured(0);
-    const QString core = selectedText.mid(leading.size(), selectedText.size() - leading.size() - trailing.size());
+    qsizetype n;
+    QByteArray leadingWs;
+    for (n = 0; n < selectedText.size(); ++n) {
+        if (!whitespaceChars.contains(selectedText[n]))
+            break;
+    }
+    leadingWs = selectedText.first(n);
+    if (leadingWs.size() == selectedText.size())
+        return { leadingWs, remaining };
+    QByteArray trailingWs;
+    for (n = selectedText.size() - 1; n >= 0; --n) {
+        if (!whitespaceChars.contains(selectedText[n]))
+            break;
+    }
+    trailingWs = selectedText.last(selectedText.size() - n + 1);
 
-    QStringList opening;
-    QStringList closing;
+    const QByteArray core = selectedText.mid(leadingWs.size(), selectedText.size() - leadingWs.size() - trailingWs.size());
+
+    QByteArrayList opening;
+    QByteArrayList closing;
     for (const auto &change : ef.formatChanges) {
         switch (change.type) {
         case InlineFormat::Bold:
-            (change.open ? opening : closing) << QStringLiteral("**");
+            (change.open ? opening : closing) << "**";
             break;
         case InlineFormat::Italic:
-            (change.open ? opening : closing) << QStringLiteral("*");
+            (change.open ? opening : closing) << "*";
             break;
         case InlineFormat::Underline:
-            (change.open ? opening : closing) << (change.open ? QStringLiteral("<ins>") : QStringLiteral("</ins>"));
+            (change.open ? opening : closing) << (change.open ? "<ins>" : "</ins>");
             break;
         case InlineFormat::PointSize:
             if (headingLevel > 0)
                 // Heading size is exclusively represented by the heading block type.
                 break;
             if (change.open)
-                opening << QStringLiteral("<span style=\"font-size:%1pt\">").arg(change.attrs.value(QStringLiteral("font-size")));
+                opening << "<span style=\"font-size:" << change.attrs.value("font-size") << "pt\">";
             else
-                closing << QStringLiteral("</span>");
+                closing << "</span>";
             break;
         case InlineFormat::Link:
             if (change.open) {
-                opening << QStringLiteral("[");
+                opening << "[";
             } else {
-                const QByteArray encoded = QUrl::toPercentEncoding(change.attrs.value(QStringLiteral("href")), ":/");
-                closing << QStringLiteral("](%1)").arg(QString::fromUtf8(encoded));
+                const QByteArray encoded = QUrl::toPercentEncoding(change.attrs.value("href"), ":/");
+                closing << "](" << encoded << ")";
             }
             break;
         }
     }
 
-    return {leading + opening.join(QString()) + core + closing.join(QString()) + trailing, remaining};
+    return {leadingWs + opening.join(QByteArray()) + core + closing.join(QByteArray()) + trailingWs, remaining};
 }
 
-QString markdownFromDocument(QTextDocument *document, const QTextCursor *range)
+QByteArray markdownFromDocument(QTextDocument *document, const QTextCursor *range)
 {
     return MarkdownWriter(document, range).exportAll();
 }

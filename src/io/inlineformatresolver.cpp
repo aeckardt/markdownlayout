@@ -154,11 +154,11 @@ void InlineFormatResolver::detectFormatChanges()
         if (!prevFmt.fontUnderline() && curFmt.fontUnderline())
             m_formats.append({InlineFormat::Type::Underline, index});
         if (prevFmt.fontPointSize() != curFmt.fontPointSize() && curFmt.fontPointSize() != defaultFontPointSize())
-            m_formats.append({InlineFormat::Type::PointSize, index, -1, {{QStringLiteral("font-size"), QString::number(int(curFmt.fontPointSize()))}}});
+            m_formats.append({InlineFormat::Type::PointSize, index, -1, {{"font-size", QByteArray::number(int(curFmt.fontPointSize()))}}});
         if (!prevFmt.isAnchor() && curFmt.isAnchor())
-            m_formats.append({InlineFormat::Type::Link, index, -1, {{QStringLiteral("href"), curFmt.anchorHref()}}});
+            m_formats.append({InlineFormat::Type::Link, index, -1, {{"href", curFmt.anchorHref().toUtf8()}}});
         else if (prevFmt.isAnchor() && curFmt.isAnchor() && prevFmt.anchorHref() != curFmt.anchorHref())
-            m_formats.append({InlineFormat::Type::Link, index, -1, {{QStringLiteral("href"), curFmt.anchorHref()}}});
+            m_formats.append({InlineFormat::Type::Link, index, -1, {{"href", curFmt.anchorHref().toUtf8()}}});
 
         // Handle closing tags
         auto closeLast = [&](InlineFormat::Type type) {

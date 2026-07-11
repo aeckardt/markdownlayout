@@ -322,7 +322,7 @@ void HtmlParser::flattenNode(HtmlNodePtr node)
     // node to the current parent node
     m_currentParent->children() += std::move(node->children());
 
-    // The floating node will be removed when the reference counter drops to 0
+    // The floating node will be removed after the reference counter drops to 0
 }
 
 void HtmlParser::flushText()
@@ -335,6 +335,31 @@ void HtmlParser::flushText()
 
     // Clear text
     m_textLength = 0;
+}
+
+/* findNode recursively searches for a node with the given tag name in the AST.
+ *
+ * Parameters:
+ *     root (HtmlNodePtr): The root of the AST or a list of nodes.
+ *     tagName (QByteArray): The tag name to search for (case-insensitive).
+ *
+ * Returns:
+ *     HtmlNodePtr: The first node matching the tag name, or nullptr if not found. */
+HtmlNodePtr HtmlParser::findNode(const HtmlNodePtr &root, const QByteArray &tagName)
+{
+    // Check if the current node matches the tag.
+    if (root->type() == HtmlNode::Type::HtmlTag && root->tag()->name() == tagName)
+        return root;
+
+    // Otherwise, search recursively in the children.
+    const QVector<HtmlNodePtr> &children = root->children();
+    for (const HtmlNodePtr &child : children) {
+        HtmlNodePtr result = findNode(child, tagName);
+        if (result)
+            return result;
+    }
+
+    return {};
 }
 
 static inline bool isAlpha(const char ch)

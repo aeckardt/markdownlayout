@@ -5,10 +5,10 @@
 #include <QTextEdit>
 #include <QTextDocument>
 
-#include "serialization/htmlimporter.h"
-#include "serialization/htmlwriter.h"
-#include "serialization/markdownimporter.h"
-#include "serialization/markdownwriter.h"
+#include "io/htmlimporter.h"
+#include "io/htmlwriter.h"
+#include "io/markdownimporter.h"
+#include "io/markdownwriter.h"
 
 static const char *markdownString =
         "# 1. Überschrift\n"
@@ -45,11 +45,15 @@ int main(int argc, char **argv)
 
     // Round trip test
     QTextDocument *doc1 = documentFromMarkdown(markdownString, &app);
-    QString exportedHtml = htmlFromDocument(doc1);
+    QByteArray exportedHtml = htmlFromDocument(doc1).toUtf8();
     QTextDocument *doc2 = documentFromHtml(exportedHtml, &app);
-    QString exportedMd = markdownFromDocument(doc2);
+    QByteArray exportedMd = markdownFromDocument(doc2);
 
     // Is the original data preserved even after double conversion?
+    printf("%s\n", markdownString);
+    printf("\n\n---\n\n");
+    printf("%s\n", exportedMd.constData());
+
     Q_ASSERT(doc1->toHtml() == doc2->toHtml());
     Q_ASSERT(markdownString == exportedMd);
 

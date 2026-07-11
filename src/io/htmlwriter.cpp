@@ -4,6 +4,7 @@
 #include "inlineformatresolver.h"
 #include "textformat/constdefs.h"
 
+#include <QByteArray>
 #include <QHash>
 #include <QString>
 #include <QTextBlock>
@@ -12,8 +13,6 @@
 #include <QTextFormat>
 #include <QVector>
 #include <QTextList>
-
-using namespace Qt::StringLiterals;
 
 class HtmlWriter
 {
@@ -155,7 +154,7 @@ QString HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
 
     int nestedUlTags = 0;
     for (const auto &tag : m_openTags) {
-        if (tag.name == "ul"_L1)
+        if (tag.name == "ul")
             ++nestedUlTags;
     }
 
@@ -163,7 +162,7 @@ QString HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
     if (open) {
         // Handle horizontal ruler
         if (blockFormat.hasProperty(QTextFormat::BlockTrailingHorizontalRulerWidth))
-            return "<hr width=\"60%\"/>"_L1;
+            return "<hr width=\"60%\"/>";
 
         // Handle heading (if headingLevel > 0)
         if (blockFormat.headingLevel() > 0) {
@@ -179,20 +178,20 @@ QString HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
             // Determine how many nested <ul> tags are needed.
             // Convention: we assume that each block's indent corresponds to (indent_level + 1) levels.
             while (nestedUlTags < indent + 1) {
-                m_openTags.append({"ul"_L1});
-                output += "<ul>"_L1;
+                m_openTags.append({"ul"});
+                output += "<ul>";
                 ++nestedUlTags;
             }
 
             // Now, open the list item.
-            m_openTags.append({"li"_L1});
-            output += "<li>"_L1;
+            m_openTags.append({"li"});
+            output += "<li>";
 
             return output;
         }
 
         // Otherwise, treat as a regular paragraph.
-        m_openTags.append({"p"_L1});
+        m_openTags.append({"p"});
         return QStringLiteral("<p%1>").arg(indentStyle);
     }
 
@@ -200,8 +199,8 @@ QString HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
     QString output;
 
     // If a list item was opened, close it.
-    if (!m_openTags.isEmpty() && m_openTags.last().name == "li"_L1) {
-        output += "</li>"_L1;
+    if (!m_openTags.isEmpty() && m_openTags.last().name == "li") {
+        output += "</li>";
         m_openTags.removeLast();
     }
 
@@ -215,12 +214,12 @@ QString HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
 
             // Close extra <ul> tags if the current indent is higher.
             while (nestedUlTags > nextIndent + 1) {
-                output += "</ul>"_L1;
+                output += "</ul>";
                 --nestedUlTags;
 
                 // Remove the last occurrence of 'ul' from open_tags.
                 for (int i = m_openTags.size() - 1; i >= 0; --i) {
-                    if (m_openTags[i].name == "ul"_L1) {
+                    if (m_openTags[i].name == "ul") {
                         m_openTags.removeAt(i);
                         break;
                     }
@@ -231,8 +230,8 @@ QString HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
         } else {
             // If the next block is not a list, close all open <ul> tags.
             for (int i = m_openTags.size() - 1; i >= 0; --i) {
-                if (m_openTags[i].name == "ul"_L1) {
-                    output += "</ul>"_L1;
+                if (m_openTags[i].name == "ul") {
+                    output += "</ul>";
                     m_openTags.removeAt(i);
                 }
             }
@@ -241,7 +240,7 @@ QString HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
     }
 
     // For paragraphs or headings, simply close all remaining block-level tags.
-    while (!m_openTags.isEmpty() && m_openTags.last().name != "ul"_L1 && m_openTags.last().name != "li"_L1) {
+    while (!m_openTags.isEmpty() && m_openTags.last().name != "ul" && m_openTags.last().name != "li") {
         const auto tag = m_openTags.takeLast();
         output += QStringLiteral("</%1>").arg(tag.name);
     }
@@ -257,28 +256,28 @@ QString HtmlWriter::inlineFormatToHtml(const ExportableFragment &fragment, bool 
         switch (change.type) {
         case InlineFormat::Link:
             tags << (open
-                     ? QStringLiteral("<a href=\"%1\">").arg(change.attrs.value("href"_L1).toHtmlEscaped())
-                     : "</a>"_L1);
+                     ? QStringLiteral("<a href=\"%1\">").arg(QString(change.attrs.value("href")).toHtmlEscaped())
+                     : "</a>");
             break;
         case InlineFormat::PointSize:
             tags << (open
-                     ? QStringLiteral("<span style=\"font-size:%1pt\">").arg(change.attrs.value("font-size"_L1))
-                     : "</span>"_L1);
+                     ? QStringLiteral("<span style=\"font-size:%1pt\">").arg(change.attrs.value("font-size"))
+                     : "</span>");
             break;
         case InlineFormat::Bold:
             tags << (open
-                     ? "<strong>"_L1
-                     : "</strong>"_L1);
+                     ? "<strong>"
+                     : "</strong>");
             break;
         case InlineFormat::Italic:
             tags << (open
-                     ? "<em>"_L1
-                     : "</em>"_L1);
+                     ? "<em>"
+                     : "</em>");
             break;
         case InlineFormat::Underline:
             tags << (open
-                     ? "<ins>"_L1
-                     : "</ins>"_L1);
+                     ? "<ins>"
+                     : "</ins>");
             break;
         }
     }
