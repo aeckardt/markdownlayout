@@ -14,9 +14,8 @@ static const char *markdownString =
         "# 1. Überschrift\n"
         "* Listenpunkt 1\n"
         "* Listenpunkt 2\n"
-        "\n"
         "## 2. Überschrift\n"
-        "Etwas **fetter** und etwas *kursiver* Text.\n";
+        "Etwas **fetter** und etwas *kursiver* Text.";
 
 class MainWindow : public QMainWindow
 {
@@ -50,10 +49,6 @@ int main(int argc, char **argv)
     QByteArray exportedMd = markdownFromDocument(doc2);
 
     // Is the original data preserved even after double conversion?
-    printf("%s\n", markdownString);
-    printf("\n\n---\n\n");
-    printf("%s\n", exportedMd.constData());
-
     Q_ASSERT(doc1->toHtml() == doc2->toHtml());
     Q_ASSERT(markdownString == exportedMd);
 

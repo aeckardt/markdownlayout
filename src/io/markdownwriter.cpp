@@ -120,7 +120,7 @@ QPair<QByteArray, int> MarkdownWriter::exportFragment(const ExportableFragment &
         if (!whitespaceChars.contains(selectedText[n]))
             break;
     }
-    trailingWs = selectedText.last(selectedText.size() - n + 1);
+    trailingWs = selectedText.last(selectedText.size() - n - 1);
 
     const QByteArray core = selectedText.mid(leadingWs.size(), selectedText.size() - leadingWs.size() - trailingWs.size());
 

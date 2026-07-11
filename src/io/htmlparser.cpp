@@ -330,6 +330,13 @@ void HtmlParser::flushText()
     if (m_textLength == 0)
         return;
 
+    QByteArray rawText =
+            m_input.sliced(m_pos - m_textLength, m_textLength);
+    if (rawText.replace('\n', "").trimmed().isEmpty()) {
+        m_textLength = 0;
+        return;
+    }
+
     // Append new text node to the tree
     integrateNode(HtmlNode::createText(htmlUnescape(m_input.sliced(m_pos - m_textLength, m_textLength))));
 
