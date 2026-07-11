@@ -175,7 +175,7 @@ HtmlTagPtr HtmlParser::parseTag()
                     return {};
             }
             // An empty attrValue can be interpreted as "true" for boolean fields
-            attrs.insert(attrName, attrValue);
+            attrs.insert(attrName, htmlUnescape(attrValue));
         } else if (ch == '/') {
             // Self closing tag
             if (fwdPos + 1 < m_length && m_input.at(fwdPos + 1) == '>') {

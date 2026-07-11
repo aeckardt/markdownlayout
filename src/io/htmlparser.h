@@ -4,8 +4,8 @@
 #include "htmlstyle.h"
 
 #include <QByteArray>
-#include <QByteArrayView>
 #include <QStack>
+#include <QVector>
 #include <memory>
 
 class HtmlTag;
