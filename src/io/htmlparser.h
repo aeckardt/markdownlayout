@@ -93,6 +93,13 @@ public:
 
     HtmlNodePtr findNode(const HtmlNodePtr &root, const QByteArray &tagName);
 
+    // Common parsing helpers
+    static inline bool isAlpha(const char ch);
+    static inline bool isAlphaNumeric(const char ch);
+    static inline bool isWhitespace(const char ch);
+
+    static QByteArray htmlUnescape(const QByteArrayView &text);
+
 private:
     bool readIdentifier(int &fwdPos, QByteArray &identifier);
     void skipWhitespaces(int &fwdPos);
@@ -114,5 +121,20 @@ private:
     QStack<HtmlNodePtr> m_openScopeStack;
     int m_textLength;
 };
+
+inline bool HtmlParser::isAlpha(const char ch)
+{
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+}
+
+inline bool HtmlParser::isAlphaNumeric(const char ch)
+{
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
+}
+
+inline bool HtmlParser::isWhitespace(const char ch)
+{
+    return ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t' || ch == '\f';
+}
 
 #endif // HTMLPARSER_H

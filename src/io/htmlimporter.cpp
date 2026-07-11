@@ -16,7 +16,6 @@
 
 #include <memory>
 
-using namespace Qt::StringLiterals;
 using NodeType = HtmlNode::Type;
 
 class HtmlRenderContext
@@ -27,9 +26,6 @@ public:
 
 private:
     typedef QHash<QByteArray, QByteArray> HtmlMetadata;
-
-    // Parse inline style string (e.g., "color: red; font-weight: bold;") into a dictionary.
-    static CssProperties parseInlineString(const QByteArray &styleStr);
 
     // Parse CSS string into m_rules dictionary
     void parseCssRules(const QByteArray &cssText);
@@ -100,30 +96,72 @@ CssProperties HtmlRenderContext::getStyleFor(const HtmlNodePtr &node) const
     // Merge initial styles
     QByteArray inlineStr = node->tag()->attrs().value("style");
     if (!inlineStr.isEmpty())
-        style.insert(parseInlineString(inlineStr));
+        style.insert(parseProperties(inlineStr));
 
     return style;
 }
 
-CssProperties HtmlRenderContext::parseInlineString(const QByteArray &styleStr)
+static void skipWhitespaceAndComments(const QByteArray &text, qsizetype &fwdPos)
 {
-    CssProperties attrs;
-    QByteArrayList properties = styleStr.split(';');
-    for (QByteArray property : properties) {
-        property = property.trimmed();
-        if (property.isEmpty() || !property.contains(':'))
+    while (fwdPos < text.size()) {
+        if (HtmlParser::isWhitespace(text.at(fwdPos))) {
+            ++fwdPos;
             continue;
+        }
 
-        // Extract name and value by splitting at ':'
-        QByteArrayList parts = property.split(':');
-        if (parts.count() != 2)
-            // Ignore mal-formed input
+        if (fwdPos + 1 < text.size()
+            && text.at(fwdPos) == '/'
+            && text.at(fwdPos + 1) == '*') {
+            fwdPos += 2;
+
+            while (fwdPos + 1 < text.size()
+                   && !(text.at(fwdPos) == '*' && text.at(fwdPos + 1) == '/')) {
+                ++fwdPos;
+            }
+
+            if (fwdPos + 1 < text.size())
+                fwdPos += 2;
+
             continue;
-        QByteArray name = parts.at(0).trimmed();
-        QByteArray value = parts.at(1).trimmed();
-        attrs.insert(name, value);
+        }
+
+        break;
     }
-    return attrs;
+}
+
+static qsizetype findNextCssChar(const QByteArray &text, qsizetype pos, char target)
+{
+    char quote = '\0';
+
+    while (pos < text.size()) {
+        const char ch = text.at(pos);
+
+        if (quote != '\0') {
+            if (ch == '\\' && pos + 1 < text.size()) {
+                pos += 2;
+                continue;
+            }
+
+            if (ch == quote)
+                quote = '\0';
+
+            ++pos;
+            continue;
+        }
+
+        if (ch == '\'' || ch == '"') {
+            quote = ch;
+            ++pos;
+            continue;
+        }
+
+        if (ch == target)
+            return pos;
+
+        ++pos;
+    }
+
+    return -1;
 }
 
 /* Parses a simple CSS string and inserts the properties into m_rules dictionary
@@ -149,23 +187,44 @@ CssProperties HtmlRenderContext::parseInlineString(const QByteArray &styleStr)
  * It currently does not handle every legal edge case, for example semicolons inside quotes strings. */
 void HtmlRenderContext::parseCssRules(const QByteArray &cssText)
 {
-    /*
-    static const QRegularExpression rulePattern(R"(([^{]+)\{([^}]+)\})");
+    qsizetype pos = 0;
 
-    auto it = rulePattern.globalMatch(cssText);
-    while (it.hasNext()) {
-        const QRegularExpressionMatch match = it.next();
+    while (pos < cssText.size()) {
+        skipWhitespaceAndComments(cssText, pos);
+        if (pos >= cssText.size())
+            break;
 
-        const QByteArray selectorBlock = match.captured(1);
-        const QByteArray propertiesStr = match.captured(2).trimmed();
+        const qsizetype selectorStart = pos;
+        const qsizetype openBrace = findNextCssChar(cssText, pos, '{');
+        if (openBrace < 0)
+            break;
+
+        const QByteArray selectorBlock =
+            cssText.mid(selectorStart, openBrace - selectorStart).trimmed();
+
+        pos = openBrace + 1;
+
+        const qsizetype propertiesStart = pos;
+        const qsizetype closeBrace = findNextCssChar(cssText, pos, '}');
+        if (closeBrace < 0)
+            break;
+
+        const QByteArray propertiesStr =
+            cssText.mid(propertiesStart, closeBrace - propertiesStart).trimmed();
+
+        pos = closeBrace + 1;
+
+        if (selectorBlock.isEmpty() || propertiesStr.isEmpty())
+            continue;
 
         const CssProperties properties = parseProperties(propertiesStr);
+        if (properties.isEmpty())
+            continue;
 
-        const QByteArrayList selectors =
-            selectorBlock.split(QLatin1Char(','), Qt::SkipEmptyParts);
+        const QByteArrayList selectors = selectorBlock.split(',');
 
-        for (const QByteArray &rawSelector : selectors) {
-            const QByteArray selector = rawSelector.trimmed();
+        for (QByteArray selector : selectors) {
+            selector = selector.trimmed().toLower();
 
             if (selector.isEmpty())
                 continue;
@@ -176,7 +235,6 @@ void HtmlRenderContext::parseCssRules(const QByteArray &cssText)
                 m_rules.insert(selector, properties);
         }
     }
-    */
 }
 
 QTextDocument *HtmlRenderer::createDocument(const HtmlNodePtr &bodyNode, const HtmlRenderContext &context,

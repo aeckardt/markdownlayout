@@ -107,12 +107,14 @@ QPair<QByteArray, int> MarkdownWriter::exportFragment(const ExportableFragment &
     static constexpr QByteArrayView whitespaceChars(" \n\t\r");
 
     qsizetype n;
+
     QByteArray leadingWs;
     for (n = 0; n < selectedText.size(); ++n) {
         if (!whitespaceChars.contains(selectedText[n]))
             break;
     }
     leadingWs = selectedText.first(n);
+
     if (leadingWs.size() == selectedText.size())
         return { leadingWs, remaining };
     QByteArray trailingWs;

@@ -4,14 +4,9 @@
 #include <QHash>
 #include <QSet>
 
-// Define parsing helpers
-static bool isAlpha(const char ch);
-static bool isAlphaNumeric(const char ch);
-static bool isHtmlSpace(const char ch);
-static int hexDigitValue(char ch);
+static int hexDigitValue(const char ch);
 static void appendUtf8CodePoint(QByteArray &out, uint codePoint);
 static bool parseCodePoint(const QByteArrayView &text, int base, uint &codePoint);
-static QByteArray htmlUnescape(const QByteArrayView &text);
 
 HtmlParser::HtmlParser(const QByteArray &html)
     : m_input(html),
@@ -133,7 +128,7 @@ HtmlTagPtr HtmlParser::parseTag()
     CssProperties attrs;
     while (fwdPos < m_length) {
         char ch = m_input.at(fwdPos);
-        if (isHtmlSpace(ch))
+        if (isWhitespace(ch))
             ++fwdPos;
         else if (isAlpha(ch)) {
             // Parse attribute
@@ -228,7 +223,7 @@ void HtmlParser::skipWhitespaces(int &fwdPos)
 {
     while (fwdPos < m_length) {
         const char ch = m_input.at(fwdPos);
-        if (isHtmlSpace(ch))
+        if (isWhitespace(ch))
             ++fwdPos;
         else
             break;
@@ -252,7 +247,7 @@ bool HtmlParser::readAttributeValue(int &fwdPos, QByteArray &value)
         while (fwdPos < m_length) {
             static constexpr QByteArrayView delimiterChars("><\"'`=");
             const char ch = m_input.at(fwdPos);
-            if (isHtmlSpace(ch) || delimiterChars.contains(ch))
+            if (isWhitespace(ch) || delimiterChars.contains(ch))
                 break;
             value += ch;
             ++fwdPos;
@@ -369,30 +364,37 @@ HtmlNodePtr HtmlParser::findNode(const HtmlNodePtr &root, const QByteArray &tagN
     return {};
 }
 
-static inline bool isAlpha(const char ch)
+static inline int hexDigitValue(const char ch)
 {
-    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
-}
-
-static inline bool isAlphaNumeric(const char ch)
-{
-    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
-}
-
-static inline bool isHtmlSpace(const char ch)
-{
-    return ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t' || ch == '\f';
-}
-
-static int hexDigitValue(char ch)
-{
-    if (ch >= '0' && ch <= '9')
+    switch (ch) {
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
         return ch - '0';
-    if (ch >= 'a' && ch <= 'f')
+    case 'a':
+    case 'b':
+    case 'c':
+    case 'd':
+    case 'e':
+    case 'f':
         return 10 + ch - 'a';
-    if (ch >= 'A' && ch <= 'F')
+    case 'A':
+    case 'B':
+    case 'C':
+    case 'D':
+    case 'E':
+    case 'F':
         return 10 + ch - 'A';
-    return -1;
+    default:
+        return -1;
+    }
 }
 
 static void appendUtf8CodePoint(QByteArray &out, uint codePoint)
@@ -434,9 +436,8 @@ static bool parseCodePoint(const QByteArrayView &text, int base, uint &codePoint
         if (base == 10) {
             if (ch >= '0' && ch <= '9')
                 digit = ch - '0';
-        } else if (base == 16) {
+        } else if (base == 16)
             digit = hexDigitValue(ch);
-        }
 
         if (digit < 0 || digit >= base)
             return false;
@@ -452,7 +453,7 @@ static bool parseCodePoint(const QByteArrayView &text, int base, uint &codePoint
     return true;
 }
 
-static QByteArray htmlUnescape(const QByteArrayView &text)
+QByteArray HtmlParser::htmlUnescape(const QByteArrayView &text)
 {
     static const QHash<QByteArrayView, QByteArray> namedEntities = {
         {"amp",  "&"},
