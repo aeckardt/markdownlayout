@@ -13,6 +13,7 @@ SOURCES += \
     src/3rdparty/md4c/md4c.c \
     src/dialogs/linkeditordialog.cpp \
     src/documentlayout/markdownlayout.cpp \
+    src/io/htmlparser.cpp \
     src/io/htmlwriter.cpp \
     src/io/inlineformatresolver.cpp \
     src/io/htmlimporter.cpp \
@@ -32,6 +33,7 @@ HEADERS += \
     src/3rdparty/md4c/md4c.h \
     src/dialogs/linkeditordialog.h \
     src/documentlayout/markdownlayout.h \
+    src/io/htmlparser.h \
     src/io/htmlwriter.h \
     src/io/inlineformatresolver.h \
     src/io/htmlimporter.h \

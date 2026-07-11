@@ -13,30 +13,30 @@ struct CssFloat {
 
 static bool parseCssFloat(const QByteArray &raw, CssFloat &f);
 
-bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
+bool applyCssToCharFormat(const CssProperties &style, QTextCharFormat &charFmt)
 {
     bool changed = false;
 
     if (style.contains("font-size")) {
         CssFloat fontSize;
-        const QByteArray raw = style.value("font-size").toLower();
+        const QByteArray raw = style.value("font-size").trimmed().toLower();
         if (parseCssFloat(raw, fontSize)) {
             if (fontSize.unit == "pt") {
                 charFmt.setFontPointSize(fontSize.value);
                 changed = true;
-            }
-            if (fontSize.unit == "px") {
+            } else if (fontSize.unit == "px") {
                 charFmt.setProperty(QTextFormat::FontPixelSize, int(fontSize.value));
                 changed = true;
-            }
+            } else
+                qWarning() << "Unsupported font-size unit ignored:" << raw;
         } else {
             static const QHash<QByteArray, int> namedSizes {
                 {"xx-small", 8},
-                {"x-small", 9},
-                {"small", 10},
-                {"medium", 12},
-                {"large", 14},
-                {"x-large", 16},
+                {"x-small",  9},
+                {"small",    10},
+                {"medium",   12},
+                {"large",    14},
+                {"x-large",  16},
                 {"xx-large", 18},
             };
             const auto size = namedSizes.value(raw, -1);
@@ -51,19 +51,19 @@ bool applyHtmlStyle(const CssProperties &style, QTextCharFormat &charFmt)
     if (style.contains("font-weight")) {
         const QByteArray raw = style.value("font-weight").trimmed().toLower();
         static const QHash<QByteArray, QFont::Weight> weights {
-            {"normal", QFont::Normal},
-            {"bold", QFont::Bold},
-            {"bolder", QFont::Bold},
+            {"normal",  QFont::Normal},
+            {"bold",    QFont::Bold},
+            {"bolder",  QFont::Bold},
             {"lighter", QFont::Light},
-            {"100", QFont::Thin},
-            {"200", QFont::ExtraLight},
-            {"300", QFont::Light},
-            {"400", QFont::Normal},
-            {"500", QFont::Medium},
-            {"600", QFont::DemiBold},
-            {"700", QFont::Bold},
-            {"800", QFont::ExtraBold},
-            {"900", QFont::Black},
+            {"100",     QFont::Thin},
+            {"200",     QFont::ExtraLight},
+            {"300",     QFont::Light},
+            {"400",     QFont::Normal},
+            {"500",     QFont::Medium},
+            {"600",     QFont::DemiBold},
+            {"700",     QFont::Bold},
+            {"800",     QFont::ExtraBold},
+            {"900",     QFont::Black},
         };
         if (weights.contains(raw)) {
             charFmt.setFontWeight(weights.value(raw));
@@ -128,29 +128,28 @@ CssProperties parseProperties(const QByteArray &propertiesStr)
 
 static bool parseCssFloat(const QByteArray &raw, CssFloat &f)
 {
-    const QByteArray normalized = raw.trimmed();
-    if (normalized.isEmpty())
+    if (raw.isEmpty())
         return false;
 
     int pos = 0;
-    while (pos < normalized.size() && normalized.at(pos) >= '0' && normalized.at(pos) <= '9')
+    while (pos < raw.size() && raw.at(pos) >= '0' && raw.at(pos) <= '9')
         ++pos;
 
     if (pos == 0)
         return false;
 
-    if (pos < normalized.size() && normalized.at(pos) == '.') {
+    if (pos < raw.size() && raw.at(pos) == '.') {
         ++pos;
-        while (pos < normalized.size() && normalized.at(pos) >= '0' && normalized.at(pos) <= '9')
+        while (pos < raw.size() && raw.at(pos) >= '0' && raw.at(pos) <= '9')
             ++pos;
     }
 
     bool ok = false;
-    const double value = normalized.left(pos).toDouble(&ok);
+    const double value = raw.left(pos).toDouble(&ok);
     if (!ok)
         return false;
 
-    const QByteArray unit = normalized.mid(pos).trimmed();
+    const QByteArray unit = raw.mid(pos).trimmed();
 
     f.value = value;
     f.unit = unit;

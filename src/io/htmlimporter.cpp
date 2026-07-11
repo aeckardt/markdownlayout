@@ -6,13 +6,10 @@
 
 #include <QByteArray>
 #include <QHash>
-#include <QRegularExpression>
 #include <QSet>
-#include <QString>
-#include <QTextBlockFormat>
-#include <QTextCharFormat>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QTextFormat>
 #include <QTextList>
 #include <QVector>
 
@@ -65,29 +62,29 @@ struct HtmlNode {
 
 using NodeType = HtmlNode::Type;
 
-class HtmlParser
+class HtmlParser__
 {
 public:
     // Parse the HTML string to generate an array of roots
     // May be one root if everything is encapsulated in <html> tag
-    static QVector<HtmlNodePtr> parse(const QString &html);
+    static QVector<HtmlNodePtr> parse(const QByteArray &html);
 
     // Recursively searches the AST for the first node with the given tag name.
-    static HtmlNodePtr findNode(const HtmlNodePtr &root, const QString &tagName);
+    static HtmlNodePtr findNode(const HtmlNodePtr &root, const QByteArray &tagName);
 
     // Search in a list rather than a single root element
-    static HtmlNodePtr findNode(const QVector<HtmlNodePtr> &nodes, const QString &tagName);
+    static HtmlNodePtr findNode(const QVector<HtmlNodePtr> &nodes, const QByteArray &tagName);
 
 private:
-    explicit HtmlParser(const QString &html) : m_input(html) {}
+    explicit HtmlParser__(const QByteArray &html) : m_input(html) {}
 
     // Tokenizer
     QVector<HtmlToken> tokenize() const;
 
     // Parser
-    QVector<HtmlNodePtr> parseChildNodes(const QVector<HtmlToken> &tokens, int &pos, const QString &stopTag = {}) const;
+    QVector<HtmlNodePtr> parseChildNodes(const QVector<HtmlToken> &tokens, int &pos, const QByteArray &stopTag = {}) const;
 
-    const QStringView m_input;
+    const QByteArrayView m_input;
 };
 
 class HtmlRenderContext
@@ -97,13 +94,13 @@ public:
     CssProperties getStyleFor(const HtmlNodePtr &node) const;
 
 private:
-    typedef QHash<QString, QString> HtmlMetadata;
+    typedef QHash<QByteArray, QByteArray> HtmlMetadata;
 
     // Parse inline style string (e.g., "color: red; font-weight: bold;") into a dictionary.
-    static CssProperties parseInlineString(const QString &styleStr);
+    static CssProperties parseInlineString(const QByteArray &styleStr);
 
     // Parse CSS string into m_rules dictionary
-    void parseCssRules(const QString &cssText);
+    void parseCssRules(const QByteArray &cssText);
 
     CssRules m_rules;
     HtmlMetadata m_metadata;
@@ -123,8 +120,6 @@ private:
     void insertBlock();
     void finalizeBlock();
 
-    void applyBlockFormatStyle(const CssProperties &style);
-
     // Render context for style compilation
     const HtmlRenderContext &m_context;
 
@@ -142,41 +137,49 @@ private:
     QTextList *m_currentList;
 };
 
-static void appendCodePoint(QString &out, uint codePoint)
+static void appendUtf8CodePoint(QByteArray &out, uint codePoint)
 {
     if (codePoint == 0 ||
         codePoint > 0x10FFFF ||
         (codePoint >= 0xD800 && codePoint <= 0xDFFF)) {
-        out.append(QChar(0xFFFD)); // replacement character
+        out.append("\xEF\xBF\xBD", 3); // U+FFFD replacement character in UTF-8
         return;
     }
 
-    if (codePoint <= 0xFFFF)
-        out.append(QChar(static_cast<ushort>(codePoint)));
-    else {
-        codePoint -= 0x10000;
-        out.append(QChar(static_cast<ushort>(0xD800 + (codePoint >> 10))));
-        out.append(QChar(static_cast<ushort>(0xDC00 + (codePoint & 0x3FF))));
+    if (codePoint <= 0x7F) {
+        out.append(static_cast<char>(codePoint));
+    } else if (codePoint <= 0x7FF) {
+        out.append(static_cast<char>(0xC0 | (codePoint >> 6)));
+        out.append(static_cast<char>(0x80 | (codePoint & 0x3F)));
+    } else if (codePoint <= 0xFFFF) {
+        out.append(static_cast<char>(0xE0 | (codePoint >> 12)));
+        out.append(static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F)));
+        out.append(static_cast<char>(0x80 | (codePoint & 0x3F)));
+    } else {
+        out.append(static_cast<char>(0xF0 | (codePoint >> 18)));
+        out.append(static_cast<char>(0x80 | ((codePoint >> 12) & 0x3F)));
+        out.append(static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F)));
+        out.append(static_cast<char>(0x80 | (codePoint & 0x3F)));
     }
 }
 
-static QString htmlUnescape(const QString &text)
+static QByteArray htmlUnescape(const QByteArray &text)
 {
-    static const QHash<QString, QString> namedEntities = {
+    static const QHash<QByteArray, QByteArray> namedEntities = {
         {"amp"_L1,  "&"_L1},
         {"lt"_L1,   "<"_L1},
         {"gt"_L1,   ">"_L1},
         {"quot"_L1, "\""_L1},
         {"apos"_L1, "'"_L1},
-        {"nbsp"_L1, QString(QChar(0x00A0))},
+        {"nbsp"_L1, QByteArray(QChar(0x00A0))},
 
         // Optional common extras:
-        {"ndash"_L1, QString(QChar(0x2013))},
-        {"mdash"_L1, QString(QChar(0x2014))},
-        {"hellip"_L1, QString(QChar(0x2026))}
+        {"ndash"_L1, QByteArray(QChar(0x2013))},
+        {"mdash"_L1, QByteArray(QChar(0x2014))},
+        {"hellip"_L1, QByteArray(QChar(0x2026))}
     };
 
-    QString out;
+    QByteArray out;
     out.reserve(text.size());
 
     qsizetype i = 0;
@@ -195,13 +198,13 @@ static QString htmlUnescape(const QString &text)
             continue;
         }
 
-        const QString entity = text.mid(i + 1, semicolon - i - 1);
+        const QByteArray entity = text.mid(i + 1, semicolon - i - 1);
 
         if (entity.startsWith(QLatin1Char('#'))) {
             bool ok = false;
             uint codePoint = 0;
 
-            QStringView entityView(entity);
+            QByteArrayView entityView(entity);
 
             if (entity.startsWith("#x"_L1, Qt::CaseInsensitive))
                 codePoint = entityView.sliced(2).toUInt(&ok, 16);
@@ -223,16 +226,16 @@ static QString htmlUnescape(const QString &text)
         }
 
         // Unknown or malformed entity: keep it unchanged.
-        out.append(QStringView(text).sliced(i, semicolon - i + 1));
+        out.append(QByteArrayView(text).sliced(i, semicolon - i + 1));
         i = semicolon + 1;
     }
 
     return out;
 }
 
-QVector<HtmlNodePtr> HtmlParser::parse(const QString &html)
+QVector<HtmlNodePtr> HtmlParser__::parse(const QByteArray &html)
 {
-    HtmlParser parser(html);
+    HtmlParser__ parser(html);
 
     // Parse input into tokens
     QVector<HtmlToken> tokens = parser.tokenize();
@@ -250,11 +253,11 @@ QVector<HtmlNodePtr> HtmlParser::parse(const QString &html)
  *
  * Parameters:
  *     root (HtmlNodePtr): The root of the AST or a list of nodes.
- *     tagName (QString): The tag name to search for (case-insensitive).
+ *     tagName (QByteArray): The tag name to search for (case-insensitive).
  *
  * Returns:
  *     HtmlNodePtr: The first node matching the tag name, or nullptr if not found. */
-HtmlNodePtr HtmlParser::findNode(const HtmlNodePtr &root, const QString &tagName)
+HtmlNodePtr HtmlParser__::findNode(const HtmlNodePtr &root, const QByteArray &tagName)
 {
     // Check if the current node matches the tag (case-insensitive).
     if (!root->name.isEmpty() && root->name.toLower() == tagName.toLower())
@@ -270,7 +273,7 @@ HtmlNodePtr HtmlParser::findNode(const HtmlNodePtr &root, const QString &tagName
     return {};
 }
 
-HtmlNodePtr HtmlParser::findNode(const QVector<HtmlNodePtr> &nodes, const QString &tagName)
+HtmlNodePtr HtmlParser__::findNode(const QVector<HtmlNodePtr> &nodes, const QByteArray &tagName)
 {
     for (const HtmlNodePtr &node : nodes) {
         HtmlNodePtr result = findNode(node, tagName);
@@ -281,13 +284,13 @@ HtmlNodePtr HtmlParser::findNode(const QVector<HtmlNodePtr> &nodes, const QStrin
     return {};
 }
 
-QVector<HtmlToken> HtmlParser::tokenize() const
+QVector<HtmlToken> HtmlParser__::tokenize() const
 {
     static const QRegularExpression tagPattern(R"((?<tag><[^>]+>)|(?<text>[^<]+))");
     static const QRegularExpression attrPattern(
         R"regex((?<name>[a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?<quote>["'])(?<value>.*?)\k<quote>)regex"
     );
-    static const QSet<QString> selfClosingTags = {"br", "img", "hr", "meta"};
+    static const QSet<QByteArray> selfClosingTags = {"br", "img", "hr", "meta"};
 
     QVector<HtmlToken> tokens;
 
@@ -299,7 +302,7 @@ QVector<HtmlToken> HtmlParser::tokenize() const
         const QByteArray text = match.captured("text").toUtf8();
 
         if (!text.isEmpty()) {
-            if (QString(text).remove('\n').trimmed().isEmpty())
+            if (QByteArray(text).remove('\n').trimmed().isEmpty())
                 continue;
 
             HtmlToken token;
@@ -372,7 +375,7 @@ QVector<HtmlToken> HtmlParser::tokenize() const
 }
 
 
-QVector<HtmlNodePtr> HtmlParser::parseChildNodes(const QVector<HtmlToken> &tokens, int &pos, const QString &tagName) const
+QVector<HtmlNodePtr> HtmlParser__::parseChildNodes(const QVector<HtmlToken> &tokens, int &pos, const QByteArray &tagName) const
 {
     QVector<HtmlNodePtr> nodes;
 
@@ -418,9 +421,9 @@ QVector<HtmlNodePtr> HtmlParser::parseChildNodes(const QVector<HtmlToken> &token
 void HtmlRenderContext::parseHeadNode(const HtmlNodePtr &headNode)
 {
     for (const HtmlNodePtr &child : headNode->children) {
-        if (child->name == "style"_L1) {
+        if (child->name == "style") {
             for (const HtmlNodePtr &styleNode : child->children) {
-                const QString &styleText = styleNode->content;
+                const QByteArray &styleText = styleNode->content;
                 parseCssRules(styleText);
             }
         } else if (child->name == "meta"_L1) {
@@ -438,29 +441,29 @@ CssProperties HtmlRenderContext::getStyleFor(const HtmlNodePtr &node) const
         style = m_rules.value(node->name);
 
     // Merge initial styles
-    QString inlineStr = node->attrs.value("style");
+    QByteArray inlineStr = node->attrs.value("style");
     if (!inlineStr.isEmpty())
         style.insert(parseInlineString(inlineStr));
 
     return style;
 }
 
-CssProperties HtmlRenderContext::parseInlineString(const QString &styleStr)
+CssProperties HtmlRenderContext::parseInlineString(const QByteArray &styleStr)
 {
     CssProperties attrs;
-    QStringList properties = styleStr.split(';', Qt::SkipEmptyParts);
-    for (QString property : properties) {
+    QByteArrayList properties = styleStr.split(';', Qt::SkipEmptyParts);
+    for (QByteArray property : properties) {
         property = property.trimmed();
         if (property.isEmpty() || !property.contains(':'))
             continue;
 
         // Extract name and value by splitting at ':'
-        QStringList parts = property.split(':', Qt::SkipEmptyParts);
+        QByteArrayList parts = property.split(':', Qt::SkipEmptyParts);
         if (parts.count() != 2)
             // Ignore mal-formed input
             continue;
-        QString name = parts.at(0).trimmed();
-        QString value = parts.at(1).trimmed();
+        QByteArray name = parts.at(0).trimmed();
+        QByteArray value = parts.at(1).trimmed();
         attrs.insert(name, value);
     }
     return attrs;
@@ -487,7 +490,7 @@ CssProperties HtmlRenderContext::parseInlineString(const QString &styleStr)
  *    }
  *
  * It currently does not handle every legal edge case, for example semicolons inside quotes strings. */
-void HtmlRenderContext::parseCssRules(const QString &cssText)
+void HtmlRenderContext::parseCssRules(const QByteArray &cssText)
 {
     static const QRegularExpression rulePattern(R"(([^{]+)\{([^}]+)\})");
 
@@ -495,16 +498,16 @@ void HtmlRenderContext::parseCssRules(const QString &cssText)
     while (it.hasNext()) {
         const QRegularExpressionMatch match = it.next();
 
-        const QString selectorBlock = match.captured(1);
-        const QString propertiesStr = match.captured(2).trimmed();
+        const QByteArray selectorBlock = match.captured(1);
+        const QByteArray propertiesStr = match.captured(2).trimmed();
 
         const CssProperties properties = parseProperties(propertiesStr);
 
-        const QStringList selectors =
+        const QByteArrayList selectors =
             selectorBlock.split(QLatin1Char(','), Qt::SkipEmptyParts);
 
-        for (const QString &rawSelector : selectors) {
-            const QString selector = rawSelector.trimmed();
+        for (const QByteArray &rawSelector : selectors) {
+            const QByteArray selector = rawSelector.trimmed();
 
             if (selector.isEmpty())
                 continue;
@@ -572,7 +575,7 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
     bool fmtChanged = false;
 
     // Handle tags
-    const QString tag = node->name.toLower();
+    const QByteArray tag = node->name.toLower();
     if (tag == "p"_L1) {
         // Safety guard for not adding a new line directly after a list item
         if (!m_newListItem)
@@ -650,8 +653,8 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
 
         // Activate safety guard for not adding a newline with a paragraph directly after
         m_newListItem = true;
-    } else if (tag == "h1"_L1 || tag == "h2"_L1 ||
-               tag == "h3"_L1 || tag == "h4"_L1) {
+    } else if (tag == "h1" || tag == "h2" || tag == "h3" ||
+               tag == "h4" || tag == "h5" || tag == "h6") {
         // Start heading in a new block
         insertBlock();
 
@@ -672,7 +675,7 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
     const CssProperties style = m_context.getStyleFor(node);
 
     // Apply styles to m_charFmt
-    fmtChanged = fmtChanged || applyHtmlStyle(style, m_charFmt);
+    fmtChanged = fmtChanged || applyCssToCharFormat(style, m_charFmt);
 
     if (m_newParagraph && tag != "p"_L1)
         // Remove guard for not adding a new line when a <br /> tag follows directly after a paragraph
@@ -747,25 +750,25 @@ void HtmlRenderer::finalizeBlock()
     m_cursor->setBlockFormat(m_blockFmt);
 }
 
-QTextDocument *documentFromHtml(const QString &html, QObject *parent)
+QTextDocument *documentFromHtml(const QByteArray &html, QObject *parent)
 {
     // Build syntax tree
-    QVector<HtmlNodePtr> nodes = HtmlParser::parse(html);
+    QVector<HtmlNodePtr> nodes = HtmlParser__::parse(html);
 
     // Find <html> tag
-    HtmlNodePtr htmlNode = HtmlParser::findNode(nodes, "html"_L1);
+    HtmlNodePtr htmlNode = HtmlParser__::findNode(nodes, "html"_L1);
     if (!htmlNode)
         // Put everything inside <html>...</html> tag
         htmlNode = HtmlNode::makeElement("html"_L1, {}, nodes);
 
     // Setup context for tag styles
     HtmlRenderContext context;
-    HtmlNodePtr headNode = HtmlParser::findNode(htmlNode, "head"_L1);
+    HtmlNodePtr headNode = HtmlParser__::findNode(htmlNode, "head"_L1);
     if (headNode)
         context.parseHeadNode(headNode);
 
     // Find <body> tag
-    HtmlNodePtr bodyNode = HtmlParser::findNode(htmlNode, "body"_L1);
+    HtmlNodePtr bodyNode = HtmlParser__::findNode(htmlNode, "body"_L1);
     if (!bodyNode)
         // Create bodyNode as root for parsing
         bodyNode = HtmlNode::makeElement("body"_L1, {}, nodes);

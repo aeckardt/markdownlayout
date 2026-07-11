@@ -23,7 +23,7 @@ BlockType blockType(const QTextBlock &block)
 
 int headingLevel(BlockType type)
 {
-    if (type < BlockType::Heading1 || type > BlockType::Heading4)
+    if (type < BlockType::Heading1 || type > BlockType::Heading6)
         return 0;
     return (int)type - (int)BlockType::Heading1 + 1;
 }
@@ -90,7 +90,9 @@ void setBlockTypeForBlock(const QTextBlock &block, BlockType type, bool toggle)
     case BlockType::Heading1:
     case BlockType::Heading2:
     case BlockType::Heading3:
-    case BlockType::Heading4: {
+    case BlockType::Heading4:
+    case BlockType::Heading5:
+    case BlockType::Heading6: {
         setHeadingCharFormat(block, level);
         blockFmt.setHeadingLevel(level);
         break;

@@ -18,6 +18,8 @@ enum class BlockType : int {
     Heading2        = 11,
     Heading3        = 12,
     Heading4        = 13,
+    Heading5        = 14,
+    Heading6        = 15,
     TextList        = 20,
     BlockQuote      = 30,
     HorizontalRuler = 40

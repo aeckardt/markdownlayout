@@ -417,7 +417,7 @@ void MarkdownRenderer::enterHtml(const HtmlScopePtr &scope)
         m_charFmtStack.push(underlineFmt);
     } else if (tag == "span") {
         QTextCharFormat spanFmt(m_charFmtStack.top());
-        applyHtmlStyle(scope->attrs(), spanFmt);
+        applyCssToCharFormat(scope->attrs(), spanFmt);
         m_charFmtStack.push(spanFmt);
     }
     m_htmlScopeStack.push(scope);
