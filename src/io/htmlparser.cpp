@@ -2,6 +2,7 @@
 
 #include <QByteArrayView>
 #include <QHash>
+#include <QSet>
 
 // Define parsing helpers
 static bool isAlpha(const char ch);
@@ -131,11 +132,11 @@ HtmlTagPtr HtmlParser::parseTag()
         if (m_input.at(fwdPos) == '>') {
             // Valid closing tag found!
             // Advance position for parser
-            HtmlTagPtr scope = HtmlTag::create(
+            HtmlTagPtr tag = HtmlTag::create(
                         tagName,
                         HtmlTag::CloseTag);
             m_pos = fwdPos + 1;
-            return scope;
+            return tag;
         }
         // Condition for valid closing tag violated
         // '>' expected, but not found
@@ -179,22 +180,26 @@ HtmlTagPtr HtmlParser::parseTag()
             // Self closing tag
             if (fwdPos + 1 < m_length && m_input.at(fwdPos + 1) == '>') {
                 // Valid self closing tag found!
-                HtmlTagPtr scope = HtmlTag::create(
+                HtmlTagPtr tag = HtmlTag::create(
                             tagName,
                             HtmlTag::SelfClosingTag,
                             attrs);
                 m_pos = fwdPos + 2;
-                return scope;
+                return tag;
             }
             return {};
         } else if (ch == '>') {
             // Closing tag found
-            HtmlTagPtr scope = HtmlTag::create(
+            static const QSet<QByteArray> selfClosingTags = {"br", "img", "hr", "meta"};
+            HtmlTag::Type type = selfClosingTags.contains(tagName)
+                    ? HtmlTag::SelfClosingTag
+                    : HtmlTag::OpenTag;
+            HtmlTagPtr tag = HtmlTag::create(
                         tagName,
-                        HtmlTag::OpenTag,
+                        type,
                         attrs);
             m_pos = fwdPos + 1;
-            return scope;
+            return tag;
         } else
             // Other characters are not allowed here:
             return {};
@@ -217,7 +222,8 @@ bool HtmlParser::readIdentifier(int &fwdPos, QByteArray &identifier)
         static constexpr QByteArrayView specialChars("-_:");
         const char ch = m_input.at(fwdPos);
         if (isAlphaNumeric(ch) || specialChars.contains(ch)) {
-            identifier += ch;
+            // Append lowercase char
+            identifier += ch - (ch >= 'A' && ch <= 'Z' ? 'A' - 'a' : 0);
             ++fwdPos;
         } else
             break;

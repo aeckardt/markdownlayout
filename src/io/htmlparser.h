@@ -108,7 +108,7 @@ private:
     void flattenNode(HtmlNodePtr node);
     void flushText();
 
-    const QByteArrayView m_input;
+    const QByteArray m_input;
     int m_pos;
     int m_length;
 
