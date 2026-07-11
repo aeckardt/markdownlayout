@@ -42,10 +42,10 @@ typedef std::shared_ptr<HtmlNode> HtmlNodePtr;
 class HtmlNode
 {
 public:
-    enum class Type : int {
-        Container,
-        HtmlTag,
-        Text
+    enum class Type : size_t {
+        Container = 0,
+        HtmlTag   = 1,
+        Text      = 2
     };
 
     static HtmlNodePtr createContainer()
@@ -61,30 +61,21 @@ public:
     HtmlNode &operator=(const HtmlNode &) = delete;
     ~HtmlNode();
 
-    Type type() const { return m_type; }
+    Type type() const { return static_cast<Type>(m_data.index()); }
 
-    HtmlTagPtr tag() const { Q_ASSERT(m_type == Type::HtmlTag); return *static_cast<HtmlTagPtr *>(m_data); }
-    QByteArray text() const { Q_ASSERT(m_type == Type::Text); return *static_cast<QByteArray *>(m_data); }
+    HtmlTagPtr tag() const { Q_ASSERT(type() == Type::HtmlTag); return *std::get<HtmlTagPtr *>(m_data); }
+    QByteArray text() const { Q_ASSERT(type() == Type::Text); return *std::get<QByteArray *>(m_data); }
 
     QVector<HtmlNodePtr> &children() { return m_children; }
     const QVector<HtmlNodePtr> &children() const { return m_children; }
-
 private:
-    HtmlNode()
-        : m_type(Type::Container), m_data(nullptr) {}
+    HtmlNode() {}
     HtmlNode(const HtmlTagPtr &tag, const QVector<HtmlNodePtr> &children)
-        : m_type(Type::HtmlTag), m_data(new HtmlTagPtr(tag)), m_children(children) {}
+        : m_data(new HtmlTagPtr(tag)), m_children(children) {}
     HtmlNode(const QByteArray &text)
-        : m_type(Type::Text), m_data(new QByteArray(text)) {}
+        : m_data(new QByteArray(text)) {}
 
-    Type m_type;
-
-    // Variant depending on m_type
-    // Type::Container -> nullptr_t
-    // Type::HtmlTag   -> HtmlTagPtr*
-    // Type::Text      -> QByteArray*
-    void *m_data;
-
+    std::variant<nullptr_t, HtmlTagPtr *, QByteArray *> m_data;
     QVector<HtmlNodePtr> m_children;
 };
 

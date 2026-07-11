@@ -15,12 +15,12 @@ static QByteArray htmlUnescape(const QByteArrayView &text);
 
 HtmlNode::~HtmlNode()
 {
-    switch (m_type) {
+    switch (type()) {
     case Type::HtmlTag:
-        delete static_cast<HtmlTagPtr *>(m_data);
+        delete std::get<HtmlTagPtr *>(m_data);
         break;
     case Type::Text:
-        delete static_cast<QByteArray *>(m_data);
+        delete std::get<QByteArray *>(m_data);
         break;
     default:
         ;
@@ -211,7 +211,7 @@ HtmlTagPtr HtmlParser::parseTag()
 bool HtmlParser::readIdentifier(int &fwdPos, QByteArray &identifier)
 {
     // Read first character
-    identifier = QByteArray(1, m_input.at(fwdPos));
+    identifier = QByteArray(1, m_input.at(fwdPos)).toLower();
 
     // The identifier needs to start with an alphabetic character
     if (!isAlpha(identifier.at(0)))
@@ -222,8 +222,11 @@ bool HtmlParser::readIdentifier(int &fwdPos, QByteArray &identifier)
         static constexpr QByteArrayView specialChars("-_:");
         const char ch = m_input.at(fwdPos);
         if (isAlphaNumeric(ch) || specialChars.contains(ch)) {
-            // Append lowercase char
-            identifier += ch - (ch >= 'A' && ch <= 'Z' ? 'A' - 'a' : 0);
+            if (ch >= 'A' && ch <= 'Z')
+                // Append lowercase char
+                identifier += ch - 'A' + 'a';
+            else
+                identifier += ch;
             ++fwdPos;
         } else
             break;
