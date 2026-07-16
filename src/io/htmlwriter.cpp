@@ -18,21 +18,21 @@ class HtmlWriter
 {
 public:
     HtmlWriter(QTextDocument *document, const QTextCursor *range, bool skipHeader);
-    QString exportAll();
+    QByteArray exportAll();
 
 private:
-    QString exportBlock(const QTextBlock &block);
-    QString blockFormatToHtml(const QTextBlock &block, bool open);
-    QString inlineFormatToHtml(const struct ExportableFragment &fragment, bool open) const;
+    QByteArray exportBlock(const QTextBlock &block);
+    QByteArray blockFormatToHtml(const QTextBlock &block, bool open);
+    QByteArray inlineFormatToHtml(const struct ExportableFragment &fragment, bool open) const;
 
-    static QString htmlHeader();
-    static QString htmlFooter();
+    static QByteArray htmlHeader();
+    static QByteArray htmlFooter();
 
     struct Tag {
-        QString name;
+        QByteArray name;
         CssProperties attrs;
 
-        inline Tag(const QString &name, const CssProperties &attrs = {})
+        inline Tag(const QByteArray &name, const CssProperties &attrs = {})
             : name(name), attrs(attrs)
         {}
     };
@@ -58,12 +58,12 @@ HtmlWriter::HtmlWriter(QTextDocument *document, const QTextCursor *range, bool s
     }
 }
 
-QString HtmlWriter::exportAll()
+QByteArray HtmlWriter::exportAll()
 {
     if (m_end < m_start)
         return "";
 
-    QString htmlOutput;
+    QByteArray htmlOutput;
     if (!m_skipHeader)
         // Create the basic HTML header and style definitions.
         htmlOutput += htmlHeader();
@@ -75,7 +75,7 @@ QString HtmlWriter::exportAll()
 
     while (block.isValid() && block.position() <= m_end) {
         // Export the block (generate HTML for the block)
-        htmlOutput += exportBlock(block) + QLatin1Char('\n');
+        htmlOutput += exportBlock(block) + '\n';
 
         // Advance to the next block
         block = block.next();
@@ -84,17 +84,17 @@ QString HtmlWriter::exportAll()
     if (!m_skipHeader)
         // Add footer
         htmlOutput += htmlFooter();
-    else if (htmlOutput.endsWith(QLatin1Char('\n')))
+    else if (htmlOutput.endsWith('\n'))
         // Remove last newline
         htmlOutput.chop(1);
 
     return htmlOutput;
 }
 
-QString HtmlWriter::exportBlock(const QTextBlock &block)
+QByteArray HtmlWriter::exportBlock(const QTextBlock &block)
 {
     // Open the block (generate starting HTML for the block)
-    QString lineHtml = blockFormatToHtml(block, true);
+    QByteArray lineHtml = blockFormatToHtml(block, true);
 
     // Resolve char formats
     auto fragments = InlineFormatResolver(block, m_start, m_end).fragments();
@@ -129,7 +129,7 @@ QString HtmlWriter::exportBlock(const QTextBlock &block)
         lineHtml += inlineFormatToHtml(ef, true);
 
         // Add selected text within fragment
-        lineHtml += selectedText.toHtmlEscaped();
+        lineHtml += selectedText.toHtmlEscaped().toUtf8();
 
         // Close formatting tags
         lineHtml += inlineFormatToHtml(ef, false);
@@ -146,11 +146,13 @@ QString HtmlWriter::exportBlock(const QTextBlock &block)
 /* Build HTML for a block (paragraph, heading, or list item).
  * Uses the open_tags stack to track which tags are open.
  * Uses inline CSS to represent indent via margin-left. */
-QString HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
+QByteArray HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
 {
     const QTextBlockFormat blockFormat = block.blockFormat();
     const int indent = blockFormat.indent();
-    const QString indentStyle = indent > 0 ? QStringLiteral(" style=\"-qt-block-indent: %1;\"").arg(indent) : QString();
+    QByteArray indentStyle;
+    if (indent > 0)
+        indentStyle = " style=\"-qt-block-indent: " + QByteArray::number(indent) + ";\"";
 
     int nestedUlTags = 0;
     for (const auto &tag : m_openTags) {
@@ -166,14 +168,14 @@ QString HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
 
         // Handle heading (if headingLevel > 0)
         if (blockFormat.headingLevel() > 0) {
-            const QString tag = QStringLiteral("h%1").arg(blockFormat.headingLevel());
+            const QByteArray tag = "h" + QByteArray::number(blockFormat.headingLevel());
             m_openTags.append(Tag{tag});
-            return QStringLiteral("<%1%2>").arg(tag, indentStyle);
+            return "<" + tag + indentStyle + ">";
         }
 
         // Handle list item
         if (block.textList()) {
-            QString output;
+            QByteArray output;
 
             // Determine how many nested <ul> tags are needed.
             // Convention: we assume that each block's indent corresponds to (indent_level + 1) levels.
@@ -192,11 +194,11 @@ QString HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
 
         // Otherwise, treat as a regular paragraph.
         m_openTags.append({"p"});
-        return QStringLiteral("<p%1>").arg(indentStyle);
+        return "<p" + indentStyle + ">";
     }
 
     // Closing tags for this block.
-    QString output;
+    QByteArray output;
 
     // If a list item was opened, close it.
     if (!m_openTags.isEmpty() && m_openTags.last().name == "li") {
@@ -240,28 +242,31 @@ QString HtmlWriter::blockFormatToHtml(const QTextBlock &block, bool open)
     }
 
     // For paragraphs or headings, simply close all remaining block-level tags.
-    while (!m_openTags.isEmpty() && m_openTags.last().name != "ul" && m_openTags.last().name != "li") {
+    while (!m_openTags.isEmpty()
+           && m_openTags.last().name != "ul"
+           && m_openTags.last().name != "li") {
         const auto tag = m_openTags.takeLast();
-        output += QStringLiteral("</%1>").arg(tag.name);
+        output += "</" + tag.name + ">";
     }
+
     return output;
 }
 
-QString HtmlWriter::inlineFormatToHtml(const ExportableFragment &fragment, bool open) const
+QByteArray HtmlWriter::inlineFormatToHtml(const ExportableFragment &fragment, bool open) const
 {
-    QStringList tags;
+    QByteArrayList tags;
     for (const auto &change : fragment.formatChanges) {
         if (open != change.open)
             continue;
         switch (change.type) {
         case InlineFormat::Link:
             tags << (open
-                     ? QStringLiteral("<a href=\"%1\">").arg(QString(change.attrs.value("href")).toHtmlEscaped())
+                     ?"<a href=\"" + QString(change.attrs.value("href")).toHtmlEscaped().toUtf8() + ">"
                      : "</a>");
             break;
         case InlineFormat::PointSize:
             tags << (open
-                     ? QStringLiteral("<span style=\"font-size:%1pt\">").arg(change.attrs.value("font-size"))
+                     ? "<span style=\"font-size:" + change.attrs.value("font-size") + "pt\">"
                      : "</span>");
             break;
         case InlineFormat::Bold:
@@ -281,31 +286,30 @@ QString HtmlWriter::inlineFormatToHtml(const ExportableFragment &fragment, bool 
             break;
         }
     }
-    return tags.join(QString());
+    return tags.join(QByteArray());
 }
 
-QString HtmlWriter::htmlHeader()
+QByteArray HtmlWriter::htmlHeader()
 {
-    return QStringLiteral(
-        "<!DOCTYPE html>\n"
-        "<html>\n"
-        "<head>\n"
-        "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n"
-        "<style type=\"text/css\">\n"
-        "p, li { white-space: pre-wrap; }\n"
-        "p, li, h1, h2, h3, h4, ul { line-height: 125%; }\n"
-        "p, li, h1, h2, h3, h4 { margin-top: 0px; margin-bottom: 2px; }\n"
-        "</style>\n"
-        "</head>\n"
-        "<body>\n");
+    return "<!DOCTYPE html>\n"
+           "<html>\n"
+           "<head>\n"
+           "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n"
+           "<style type=\"text/css\">\n"
+           "p, li { white-space: pre-wrap; }\n"
+           "p, li, h1, h2, h3, h4, ul { line-height: 125%; }\n"
+           "p, li, h1, h2, h3, h4 { margin-top: 0px; margin-bottom: 2px; }\n"
+           "</style>\n"
+           "</head>\n"
+           "<body>\n";
 }
 
-QString HtmlWriter::htmlFooter()
+QByteArray HtmlWriter::htmlFooter()
 {
-    return QStringLiteral("</body>\n</html>");
+    return "</body>\n</html>";
 }
 
-QString htmlFromDocument(QTextDocument *document, const QTextCursor *range, bool skipHeader)
+QByteArray htmlFromDocument(QTextDocument *document, const QTextCursor *range, bool skipHeader)
 {
     return HtmlWriter(document, range, skipHeader).exportAll();
 }

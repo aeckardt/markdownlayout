@@ -27,7 +27,9 @@ static const char *markdownString =
         "\n"
         "> Ein Zitat in einem BlockQuote.\n"
         "\n"
-        "Und noch ein [Hyperlink](https://google.se).\n";
+        "Und noch ein [Hyperlink](https://google.se).\n"
+        "\n"
+        "<span style=\"font-size:72pt;\">Eine sehr große Schrift.</span>\n";
 
 class MainWindow : public QMainWindow
 {

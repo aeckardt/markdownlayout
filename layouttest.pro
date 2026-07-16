@@ -1,7 +1,6 @@
 QT += core gui widgets
 
 CONFIG += c++17 console
-CONFIG -= app_bundle
 
 QMAKE_CXXFLAGS += -fmessage-length=0
 
@@ -50,6 +49,10 @@ HEADERS += \
 
 INCLUDEPATH += \
     src
+
+macx {
+    ICON = icons/app-icon.png
+}
 
 OTHER_FILES += \
     README.md \

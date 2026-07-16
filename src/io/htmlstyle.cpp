@@ -13,9 +13,14 @@ struct CssFloat {
 
 static bool parseCssFloat(const QByteArray &raw, CssFloat &f);
 
-bool applyCssToCharFormat(const CssProperties &style, QTextCharFormat &charFmt)
+bool applyCssToCharFormat(const CssProperties &attrs, QTextCharFormat &charFmt)
 {
     bool changed = false;
+
+    // Extract style properties from attributes
+    CssProperties style;
+    if (attrs.contains("style"))
+        style = parseProperties(attrs.value("style"));
 
     if (style.contains("font-size")) {
         CssFloat fontSize;

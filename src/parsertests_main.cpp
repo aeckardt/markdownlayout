@@ -44,7 +44,7 @@ int main(int argc, char **argv)
 
     // Round trip test
     QTextDocument *doc1 = documentFromMarkdown(markdownString, &app);
-    QByteArray exportedHtml = htmlFromDocument(doc1).toUtf8();
+    QByteArray exportedHtml = htmlFromDocument(doc1);
     QTextDocument *doc2 = documentFromHtml(exportedHtml, &app);
     QByteArray exportedMd = markdownFromDocument(doc2);
 

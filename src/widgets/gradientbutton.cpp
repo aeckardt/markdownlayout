@@ -205,7 +205,7 @@ void GradientButton::paintEvent(QPaintEvent *)
     QPainterPath path;
     path.addRect(QRectF(r));
 
-    painter.setPen(QColor("#dfdfdf"));
+    painter.setPen(QColor(0xdfdfdf));
     painter.drawPath(path);
 
     if (m_type == Type::ImageButton) {
@@ -301,7 +301,7 @@ void GradientButton::initShadow()
 {
     m_shadow->setBlurRadius(15);
     m_shadow->setOffset(1, 0);
-    m_shadow->setColor(QColor("#8eb7f1"));
+    m_shadow->setColor(QColor(0x8eb7f1));
     setGraphicsEffect(m_shadow);
 }
 
@@ -318,13 +318,13 @@ void GradientButton::setState(State newState)
 
     switch (newState) {
     case State::Disabled:
-        m_gradient.setColorAt(0,    QColor("#d7d7d7"));
-        m_gradient.setColorAt(0.15, QColor("#dfdfdf"));
-        m_gradient.setColorAt(0,    QColor("#e7e7e7"));
-        m_gradient.setColorAt(0.85, QColor("#efefef"));
-        m_gradient.setColorAt(0,    QColor("#f3f3f3"));
+        m_gradient.setColorAt(0,    QColor(0xd7d7d7));
+        m_gradient.setColorAt(0.15, QColor(0xdfdfdf));
+        m_gradient.setColorAt(0,    QColor(0xe7e7e7));
+        m_gradient.setColorAt(0.85, QColor(0xefefef));
+        m_gradient.setColorAt(0,    QColor(0xf3f3f3));
         m_offset = 0;
-        m_textColor = QColor("#555555");
+        m_textColor = QColor(0x555555);
         break;
     case State::Inactive:
     case State::Active:
@@ -335,7 +335,7 @@ void GradientButton::setState(State newState)
         m_gradient.setColorAt(0.85, m_defaultColors.at(3));
         m_gradient.setColorAt(0,    m_defaultColors.at(4));
         m_offset = newState == State::Clicked ? 1 : 0;
-        m_textColor = QColor("#111111");
+        m_textColor = QColor(0x111111);
         break;
     case State::Checked:
         m_gradient.setColorAt(0,    m_checkedStateColors.at(0));
@@ -344,7 +344,7 @@ void GradientButton::setState(State newState)
         m_gradient.setColorAt(0.85, m_checkedStateColors.at(3));
         m_gradient.setColorAt(0,    m_checkedStateColors.at(4));
         m_offset = 1;
-        m_textColor = QColor("#111111");
+        m_textColor = QColor(0x111111);
         break;
     default:
         ;
