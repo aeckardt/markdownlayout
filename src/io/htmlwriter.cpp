@@ -266,7 +266,7 @@ QByteArray HtmlWriter::inlineFormatToHtml(const ExportableFragment &fragment, bo
             break;
         case InlineFormat::PointSize:
             tags << (open
-                     ? "<span style=\"font-size:" + change.attrs.value("font-size") + "pt\">"
+                     ? "<span style=\"font-size:" + change.attrs.value("font-size") + "\">"
                      : "</span>");
             break;
         case InlineFormat::Bold:

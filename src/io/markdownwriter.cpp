@@ -144,7 +144,7 @@ QPair<QByteArray, int> MarkdownWriter::exportFragment(const ExportableFragment &
                 // Heading size is exclusively represented by the heading block type.
                 break;
             if (change.open)
-                opening << "<span style=\"font-size:" << change.attrs.value("font-size") << "pt\">";
+                opening << "<span style=\"font-size:" << change.attrs.value("font-size") << "\">";
             else
                 closing << "</span>";
             break;
