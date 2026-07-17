@@ -17,7 +17,7 @@ bool applyCssToCharFormat(const CssDeclarations &style, QTextCharFormat &charFmt
 {
     bool changed = false;
 
-    // Extract style properties from attributes
+    // Apply parsed CSS declarations to QTextCharFormat
     if (style.contains("font-size")) {
         CssFloat fontSize;
         const QByteArray raw = style.value("font-size").toLower();
@@ -118,7 +118,7 @@ CssDeclarations parseCss(const QByteArray &styleStr)
         if (colonIndex < 0)
             continue;
 
-        const QByteArray name = declStr.left(colonIndex).trimmed();
+        const QByteArray name = declStr.left(colonIndex).trimmed().toLower();
         const QByteArray value = declStr.mid(colonIndex + 1).trimmed();
 
         parsed.insert(name, value);

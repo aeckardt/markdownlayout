@@ -1,9 +1,9 @@
 #ifndef HTMLSTYLE_H
 #define HTMLSTYLE_H
 
-#include <QByteArray>
-#include <QHash>
-
+class QByteArray;
+template<typename Key, typename T>
+class QHash;
 class QTextCharFormat;
 
 typedef QHash<QByteArray, QByteArray> HtmlAttributes;

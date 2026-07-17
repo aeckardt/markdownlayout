@@ -4,6 +4,7 @@
 #include "htmlstyle.h"
 
 #include <QByteArray>
+#include <QHash>
 #include <QStack>
 #include <QVector>
 #include <memory>
@@ -37,7 +38,7 @@ private:
 
     QByteArray m_tagName;
     Type m_type;
-    QHash<QByteArray, QByteArray> m_attrs;
+    HtmlAttributes m_attrs;
 };
 
 class HtmlNode;

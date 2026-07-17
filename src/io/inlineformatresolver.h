@@ -1,6 +1,8 @@
 #ifndef INLINEFORMATRESOLVER_H
 #define INLINEFORMATRESOLVER_H
 
+#include "htmlstyle.h"
+
 #include <QHash>
 #include <QTextBlock>
 #include <QTextCharFormat>
@@ -19,7 +21,7 @@ struct InlineFormat {
     Type type;
     int start;
     int end;
-    QHash<QByteArray, QByteArray> attrs;
+    HtmlAttributes attrs;
 
     InlineFormat(Type type, int start, int end = -1)
         : type(type), start(start), end(end), attrs(QHash<QByteArray, QByteArray>()) {}
@@ -29,7 +31,7 @@ struct InlineFormat {
 
 struct FormatChange {
     InlineFormat::Type type;
-    QHash<QByteArray, QByteArray> attrs;
+    HtmlAttributes attrs;
     bool open;
 };
 

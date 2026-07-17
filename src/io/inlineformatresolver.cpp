@@ -4,7 +4,12 @@
 #include <algorithm>
 
 InlineFormatResolver::InlineFormatResolver(const QTextBlock &block, int start, int end)
-    : m_block(block), m_start(start), m_end(end), m_useRange(start != -1 && end != -1), m_firstIndex(-1), m_lastIndex(-1)
+    : m_block(block),
+      m_start(start),
+      m_end(end),
+      m_useRange(start != -1 && end != -1),
+      m_firstIndex(-1),
+      m_lastIndex(-1)
 {
     if (m_useRange)
         normalizeBoundaries();
@@ -154,7 +159,7 @@ void InlineFormatResolver::detectFormatChanges()
         if (!prevFmt.fontUnderline() && curFmt.fontUnderline())
             m_formats.append({InlineFormat::Type::Underline, index});
         if (prevFmt.fontPointSize() != curFmt.fontPointSize() && curFmt.fontPointSize() != defaultFontPointSize())
-            m_formats.append({InlineFormat::Type::PointSize, index, -1, {{"font-size", QByteArray::number(int(curFmt.fontPointSize()))}}});
+            m_formats.append({InlineFormat::Type::PointSize, index, -1, {{"font-size", QByteArray::number(int(curFmt.fontPointSize())) + "pt"}}});
         if (!prevFmt.isAnchor() && curFmt.isAnchor())
             m_formats.append({InlineFormat::Type::Link, index, -1, {{"href", curFmt.anchorHref().toUtf8()}}});
         else if (prevFmt.isAnchor() && curFmt.isAnchor() && prevFmt.anchorHref() != curFmt.anchorHref())

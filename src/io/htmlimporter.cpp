@@ -77,7 +77,7 @@ void HtmlRenderContext::parseHeadNode(const HtmlNodePtr &headNode)
                 }
             }
         } else if (child->type() == NodeType::HtmlTag && child->tag()->name() == "meta") {
-            const CssDeclarations &attrs = child->tag()->attrs();
+            const HtmlAttributes &attrs = child->tag()->attrs();
             if (attrs.contains("name") && attrs.contains("content"))
                 m_metadata.insert(attrs.value("name"), attrs.value("content"));
         }
