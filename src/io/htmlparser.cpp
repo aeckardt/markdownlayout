@@ -125,7 +125,7 @@ HtmlTagPtr HtmlParser::parseTag()
     }
 
     // Parse attributes or end of tag
-    CssProperties attrs;
+    HtmlAttributes attrs;
     while (fwdPos < m_length) {
         char ch = m_input.at(fwdPos);
         if (isWhitespace(ch))

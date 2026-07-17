@@ -17,7 +17,6 @@ SOURCES += \
     src/io/inlineformatresolver.cpp \
     src/io/htmlimporter.cpp \
     src/io/htmlstyle.cpp \
-    src/io/markdownhtmlparser.cpp \
     src/io/markdownimporter.cpp \
     src/io/markdownwriter.cpp \
     src/texteditor/texteditor.cpp \
@@ -37,7 +36,6 @@ HEADERS += \
     src/io/inlineformatresolver.h \
     src/io/htmlimporter.h \
     src/io/htmlstyle.h \
-    src/io/markdownhtmlparser.h \
     src/io/markdownimporter.h \
     src/io/markdownwriter.h \
     src/texteditor/texteditor.h \

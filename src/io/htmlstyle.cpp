@@ -13,18 +13,14 @@ struct CssFloat {
 
 static bool parseCssFloat(const QByteArray &raw, CssFloat &f);
 
-bool applyCssToCharFormat(const CssProperties &attrs, QTextCharFormat &charFmt)
+bool applyCssToCharFormat(const CssDeclarations &style, QTextCharFormat &charFmt)
 {
     bool changed = false;
 
     // Extract style properties from attributes
-    CssProperties style;
-    if (attrs.contains("style"))
-        style = parseProperties(attrs.value("style"));
-
     if (style.contains("font-size")) {
         CssFloat fontSize;
-        const QByteArray raw = style.value("font-size").trimmed().toLower();
+        const QByteArray raw = style.value("font-size").toLower();
         if (parseCssFloat(raw, fontSize)) {
             if (fontSize.unit == "pt") {
                 charFmt.setFontPointSize(fontSize.value);
@@ -54,7 +50,7 @@ bool applyCssToCharFormat(const CssProperties &attrs, QTextCharFormat &charFmt)
     }
 
     if (style.contains("font-weight")) {
-        const QByteArray raw = style.value("font-weight").trimmed().toLower();
+        const QByteArray raw = style.value("font-weight").toLower();
         static const QHash<QByteArray, QFont::Weight> weights {
             {"normal",  QFont::Normal},
             {"bold",    QFont::Bold},
@@ -78,7 +74,7 @@ bool applyCssToCharFormat(const CssProperties &attrs, QTextCharFormat &charFmt)
     }
 
     if (style.contains("font-style")) {
-        const QByteArray raw = style.value("font-style").trimmed().toLower();
+        const QByteArray raw = style.value("font-style").toLower();
         if (raw == "italic" || raw == "oblique") {
             charFmt.setFontItalic(true);
             changed = true;
@@ -90,7 +86,7 @@ bool applyCssToCharFormat(const CssProperties &attrs, QTextCharFormat &charFmt)
     }
 
     if (style.contains("text-decoration")) {
-        const QByteArray raw = style.value("text-decoration").trimmed().toLower();
+        const QByteArray raw = style.value("text-decoration").toLower();
         if (raw == "underline") {
             charFmt.setFontUnderline(true);
             changed = true;
@@ -104,31 +100,31 @@ bool applyCssToCharFormat(const CssProperties &attrs, QTextCharFormat &charFmt)
     return changed;
 }
 
-CssProperties parseProperties(const QByteArray &propertiesStr)
+CssDeclarations parseCss(const QByteArray &styleStr)
 {
-    CssProperties properties;
+    CssDeclarations parsed;
 
-    const QList<QByteArray> declarations =
-        propertiesStr.split(';');
+    const QList<QByteArray> declList =
+        styleStr.split(';');
 
-    for (const QByteArray &decl : declarations) {
-        const QByteArray property = decl.trimmed();
+    for (int i = 0; i < declList.size(); ++i) {
+        const QByteArray declStr = declList.at(i).trimmed();
 
-        if (property.isEmpty())
+        if (declStr.isEmpty())
             continue;
 
-        const qsizetype colonIndex = property.indexOf(':');
+        const qsizetype colonIndex = declStr.indexOf(':');
 
         if (colonIndex < 0)
             continue;
 
-        const QByteArray name = property.left(colonIndex).trimmed();
-        const QByteArray value = property.mid(colonIndex + 1).trimmed();
+        const QByteArray name = declStr.left(colonIndex).trimmed();
+        const QByteArray value = declStr.mid(colonIndex + 1).trimmed();
 
-        properties.insert(name, value);
+        parsed.insert(name, value);
     }
 
-    return properties;
+    return parsed;
 }
 
 static bool parseCssFloat(const QByteArray &raw, CssFloat &f)

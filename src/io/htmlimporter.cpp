@@ -22,7 +22,7 @@ class HtmlRenderContext
 {
 public:
     void parseHeadNode(const HtmlNodePtr &headNode);
-    CssProperties getStyleFor(const HtmlNodePtr &node) const;
+    CssDeclarations getStyleFor(const HtmlNodePtr &node) const;
 
 private:
     typedef QHash<QByteArray, QByteArray> HtmlMetadata;
@@ -77,26 +77,27 @@ void HtmlRenderContext::parseHeadNode(const HtmlNodePtr &headNode)
                 }
             }
         } else if (child->type() == NodeType::HtmlTag && child->tag()->name() == "meta") {
-            const CssProperties &attrs = child->tag()->attrs();
+            const CssDeclarations &attrs = child->tag()->attrs();
             if (attrs.contains("name") && attrs.contains("content"))
                 m_metadata.insert(attrs.value("name"), attrs.value("content"));
         }
     }
 }
 
-CssProperties HtmlRenderContext::getStyleFor(const HtmlNodePtr &node) const
+CssDeclarations HtmlRenderContext::getStyleFor(const HtmlNodePtr &node) const
 {
     if (node->type() != NodeType::HtmlTag)
         return {};
 
-    CssProperties style;
+    // Use global style
+    CssDeclarations style;
     if (m_rules.contains(node->tag()->name()))
         style = m_rules.value(node->tag()->name());
 
-    // Merge initial styles
-    QByteArray inlineStr = node->tag()->attrs().value("style");
-    if (!inlineStr.isEmpty())
-        style.insert(parseProperties(inlineStr));
+    // Merge (override) with local style
+    QByteArray cssStr = node->tag()->attrs().value("style");
+    if (!cssStr.isEmpty())
+        style.insert(parseCss(cssStr));
 
     return style;
 }
@@ -204,20 +205,20 @@ void HtmlRenderContext::parseCssRules(const QByteArray &cssText)
 
         pos = openBrace + 1;
 
-        const qsizetype propertiesStart = pos;
+        const qsizetype cssStart = pos;
         const qsizetype closeBrace = findNextCssChar(cssText, pos, '}');
         if (closeBrace < 0)
             break;
 
-        const QByteArray propertiesStr =
-            cssText.mid(propertiesStart, closeBrace - propertiesStart).trimmed();
+        const QByteArray cssStr =
+            cssText.mid(cssStart, closeBrace - cssStart).trimmed();
 
         pos = closeBrace + 1;
 
-        if (selectorBlock.isEmpty() || propertiesStr.isEmpty())
+        if (selectorBlock.isEmpty() || cssStr.isEmpty())
             continue;
 
-        const CssProperties properties = parseProperties(propertiesStr);
+        const CssDeclarations properties = parseCss(cssStr);
         if (properties.isEmpty())
             continue;
 
@@ -389,7 +390,7 @@ void HtmlRenderer::renderNode(const HtmlNodePtr &node)
     }
 
     // Handle styles
-    const CssProperties style = m_context.getStyleFor(node);
+    const CssDeclarations style = m_context.getStyleFor(node);
 
     // Apply styles to m_charFmt
     fmtChanged = fmtChanged || applyCssToCharFormat(style, m_charFmt);

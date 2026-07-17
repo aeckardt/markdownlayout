@@ -6,10 +6,11 @@
 
 class QTextCharFormat;
 
-typedef QHash<QByteArray, QByteArray> CssProperties;
-typedef QHash<QByteArray, CssProperties> CssRules;
+typedef QHash<QByteArray, QByteArray> HtmlAttributes;
+typedef QHash<QByteArray, QByteArray> CssDeclarations;
+typedef QHash<QByteArray, CssDeclarations> CssRules;
 
-bool applyCssToCharFormat(const CssProperties &attrs, QTextCharFormat &charFormat);
-CssProperties parseProperties(const QByteArray &propertiesStr);
+bool applyCssToCharFormat(const CssDeclarations &style, QTextCharFormat &charFormat);
+CssDeclarations parseCss(const QByteArray &styleStr);
 
 #endif

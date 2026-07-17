@@ -30,9 +30,9 @@ private:
 
     struct Tag {
         QByteArray name;
-        CssProperties attrs;
+        CssDeclarations attrs;
 
-        inline Tag(const QByteArray &name, const CssProperties &attrs = {})
+        inline Tag(const QByteArray &name, const CssDeclarations &attrs = {})
             : name(name), attrs(attrs)
         {}
     };
@@ -261,7 +261,7 @@ QByteArray HtmlWriter::inlineFormatToHtml(const ExportableFragment &fragment, bo
         switch (change.type) {
         case InlineFormat::Link:
             tags << (open
-                     ?"<a href=\"" + QString(change.attrs.value("href")).toHtmlEscaped().toUtf8() + ">"
+                     ?"<a href=\"" + QString(change.attrs.value("href")).toHtmlEscaped().toUtf8() + "\">"
                      : "</a>");
             break;
         case InlineFormat::PointSize:

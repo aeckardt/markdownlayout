@@ -21,7 +21,7 @@ public:
         SelfClosingTag
     };
 
-    static HtmlTagPtr create(const QByteArray &tag, Type type, const CssProperties &attrs = {})
+    static HtmlTagPtr create(const QByteArray &tag, Type type, const HtmlAttributes &attrs = {})
     { return HtmlTagPtr(new HtmlTag(tag, type, attrs)); }
 
     HtmlTag(const HtmlTag &) = delete;
@@ -29,10 +29,10 @@ public:
 
     QByteArray name() const { return m_tagName; }
     Type type() const { return m_type; }
-    CssProperties attrs() const { return m_attrs; }
+    HtmlAttributes attrs() const { return m_attrs; }
 
 private:
-    HtmlTag(const QByteArray &tag, Type type, const CssProperties &attrs = {})
+    HtmlTag(const QByteArray &tag, Type type, const HtmlAttributes &attrs = {})
         : m_tagName(tag), m_type(type), m_attrs(attrs) {}
 
     QByteArray m_tagName;
